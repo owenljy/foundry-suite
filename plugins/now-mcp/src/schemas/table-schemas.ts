@@ -86,7 +86,9 @@ export const AggregateRecordsSchema = z.object({
 		.union([z.boolean(), z.literal('all')])
 		.optional()
 		.default(false)
-		.describe('Return display values for group-by fields'),
+		.describe(
+			'Return display values (names) for group-by reference fields — set true when grouping by a reference field to avoid a second sys_id→name lookup.',
+		),
 });
 
 export type AggregateRecordsInput = z.infer<typeof AggregateRecordsSchema>;
