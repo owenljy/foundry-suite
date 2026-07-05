@@ -12,8 +12,8 @@
       "description": "Fluent-native MCP server for ServiceNow, paired with auto-injected now-sdk/now-mcp workflow rules."
     },
     {
-      "name": "toolkit",
-      "source": "./toolkit",
+      "name": "aia-toolkit",
+      "source": "./aia-toolkit",
       "description": "Skills for the full ServiceNow AI Agent lifecycle — build, audit, dataset, eval-runner, and trace analysis. Pairs with now-mcp for live-instance reads and script execution."
     }
   ]

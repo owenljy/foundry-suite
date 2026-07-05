@@ -9,7 +9,7 @@ it grows over time:
   Claude **operate a running ServiceNow instance**: read and write runtime data,
   inspect schema, run scripts, manage attachments. It also carries on-demand
   skills (e.g. `sn-docs-search`) and the Fluent-workflow SessionStart hook.
-- **`toolkit`** — skills for the full **ServiceNow AI Agent lifecycle**: build an
+- **`aia-toolkit`** — skills for the full **ServiceNow AI Agent lifecycle**: build an
   agent as now-sdk Fluent (`sn-aia-agent-builder`), audit it against deployment
   guardrails (`sn-aia-agent-audit`), build eval datasets (`sn-aia-dataset-builder`),
   set up the platform eval pipeline (`sn-eval-runner-builder`), and analyze
@@ -59,12 +59,12 @@ install whichever plugins you want:
 ```
 /plugin marketplace add <REPO_URL>
 /plugin install now-mcp@foundry-suite      # the MCP server + Fluent skills/hook
-/plugin install toolkit@foundry-suite      # the AI Agent lifecycle skills (optional)
+/plugin install aia-toolkit@foundry-suite  # the AI Agent lifecycle skills (optional)
 /reload-plugins
 ```
 
-Install `now-mcp` alone for the data/schema/script tools; add `toolkit` when you
-work on ServiceNow AI Agents. `toolkit` is skills-only (no setup form) and uses
+Install `now-mcp` alone for the data/schema/script tools; add `aia-toolkit` when you
+work on ServiceNow AI Agents. `aia-toolkit` is skills-only (no setup form) and uses
 `now-mcp` for its live-instance reads, so installing both is the usual setup.
 
 
