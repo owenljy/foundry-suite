@@ -7,7 +7,7 @@ import { AggregateRecordsSchema } from '../schemas/table-schemas.js';
 import type { TableService } from '../services/table-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const AGGREGATE_RECORDS_TOOL = {
 	name: 'servicenow_aggregate_records',
@@ -17,19 +17,11 @@ When to use: For "how many", "total count", "per group", "grouped by", or numeri
 Preconditions: Table must exist; the account needs read access.
 Produces: Aggregate numbers (a single object, or an array of groups when groupBy is set).
 
-Computes numbers server-side via the Stats API, so it is far cheaper than querying rows and reducing them client-side.
+Computed server-side via the Stats API — far cheaper than querying rows and reducing client-side. groupBy supports dot-walking; having filters post-aggregation (e.g. "count>5").
 
 Examples:
-- Count P1 incidents by assignment group:
-  tableName="incident", query="priority=1", groupBy=["assignment_group"], count=true
-- Average reassignment count of active incidents:
-  tableName="incident", query="active=true", avgFields=["reassignment_count"]
-- Open incidents per caller department (dot-walked group-by):
-  tableName="incident", query="active=true", groupBy=["caller_id.department"], count=true
-- Only groups with more than 5 records:
-  tableName="incident", groupBy=["assignment_group"], count=true, having="count>5"
-
-Set displayValue=true to get readable labels for group-by reference fields.`,
+- Count P1s per group: tableName="incident", query="priority=1", groupBy=["assignment_group"], count=true
+- Avg over a field: tableName="incident", query="active=true", avgFields=["reassignment_count"]`,
 	inputSchema: AggregateRecordsSchema,
 	outputSchema: AggregateRecordsOutputSchema,
 };
@@ -86,17 +78,10 @@ export function createAggregateRecordsTool(tableService: TableService) {
 					meta.rowCount = result.length;
 				}
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-					// Result-level metadata, separate from the text body (WS-B §4.2).
-					_meta: meta,
-				};
+				const summary = grouped
+					? `${Array.isArray(result) ? result.length : 0} group(s) on ${v.tableName}`
+					: `aggregate on ${v.tableName}`;
+				return toolResult(response, summary, { meta });
 			} catch (error) {
 				logger.error('Error aggregating records', error);
 				return toolError(error, { table: tableName, operation: 'aggregate' });

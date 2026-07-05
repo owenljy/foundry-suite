@@ -3,19 +3,14 @@
  */
 
 import { z } from 'zod';
+import { instanceField, tableNameField } from './common.js';
 
 /**
  * Schema for getting table schema/structure
  */
 export const GetTableSchemaSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	includeExtended: z
 		.boolean()
 		.default(false)
@@ -28,10 +23,7 @@ export type GetTableSchemaInput = z.infer<typeof GetTableSchemaSchema>;
  * Schema for listing all available tables
  */
 export const ListTablesSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
+	instance: instanceField,
 	filter: z.string().optional().describe('Filter tables by name (supports wildcards with *)'),
 	limit: z
 		.number()
@@ -48,14 +40,8 @@ export type ListTablesInput = z.infer<typeof ListTablesSchema>;
  * Schema for getting choice list values for a field
  */
 export const GetChoiceListSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	fieldName: z
 		.string()
 		.min(1, 'Field name is required')

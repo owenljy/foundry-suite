@@ -3,34 +3,20 @@
  */
 
 import { z } from 'zod';
+import { instanceField, sysIdField, tableNameField } from './common.js';
 
 /**
  * Schema for comparing two records on the same table.
- *
- * sysIdA / sysIdB mirror the attachment-schemas sys_id validation (exactly 32
- * hexadecimal characters).
  */
 export const DiffRecordsSchema = z.object({
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
-	sysIdA: z
-		.string()
-		.length(32, 'sysIdA must be exactly 32 characters')
-		.regex(/^[a-f0-9]{32}$/i, 'sysIdA must be a valid hexadecimal string'),
-	sysIdB: z
-		.string()
-		.length(32, 'sysIdB must be exactly 32 characters')
-		.regex(/^[a-f0-9]{32}$/i, 'sysIdB must be a valid hexadecimal string'),
+	tableName: tableNameField(),
+	sysIdA: sysIdField('sysIdA'),
+	sysIdB: sysIdField('sysIdB'),
 	fields: z
 		.array(z.string())
 		.optional()
 		.describe('Optional subset of fields to compare (defaults to all fields on both records)'),
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
+	instance: instanceField,
 });
 
 export type DiffRecordsInput = z.infer<typeof DiffRecordsSchema>;

@@ -10,7 +10,7 @@ import { formatErrorForTool } from '../utils/error-handler.js';
 import { failureHints, renderHints } from '../utils/failure-enrichment.js';
 import { preflightFieldValidation } from '../utils/field-validation.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const UPDATE_RECORD_TOOL = {
 	name: 'servicenow_update_record',
@@ -18,13 +18,9 @@ export const UPDATE_RECORD_TOOL = {
 	description: `What: Modify an existing record (PATCH partial or PUT full) by sys_id.
 When to use: To change field values on a known record. For app metadata, use the Fluent SDK instead.
 Preconditions: Write-enabled instance (readOnly: false); valid sys_id; field names valid for the table (validated automatically).
-Produces: The updated record with its current field values.
+Produces: sys_id plus the fields you changed (not the whole row).
 
-updateType: "partial" (default) PATCHes only the provided fields; "full" PUTs a full replacement.
-
-Examples:
-- tableName="incident", sysId="abc123...", fields={"state":"2"}, updateType="partial"
-- tableName="sys_user", sysId="xyz789...", fields={"email":"new.email@example.com"}`,
+Example: tableName="incident", sysId="abc123...", fields={"state":"2"}, updateType="full"`,
 	inputSchema: UpdateRecordSchema,
 	outputSchema: UpdateRecordOutputSchema,
 };
@@ -62,25 +58,20 @@ export function createUpdateRecordTool(tableService: TableService, schemaService
 					validated.instance,
 				);
 
-				// Format response for LLM
+				// Lean echo: sys_id + the fields the caller changed, not the whole row.
+				const changed: Record<string, unknown> = { sys_id: record.sys_id };
+				for (const k of Object.keys(validated.fields)) {
+					if (k in record) changed[k] = record[k];
+				}
 				const response = {
 					success: true,
-					message: `Successfully updated record ${validated.sysId} in ${validated.tableName}`,
 					table: validated.tableName,
-					sys_id: record.sys_id,
+					sys_id: typeof record.sys_id === 'string' ? record.sys_id : undefined,
 					updateType: validated.updateType,
-					record: record,
+					record: changed,
 				};
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				return toolResult(response, `updated ${validated.tableName} ${validated.sysId}`);
 			} catch (error) {
 				logger.error('Error updating record', error);
 

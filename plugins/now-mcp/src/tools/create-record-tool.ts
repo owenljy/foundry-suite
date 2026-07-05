@@ -10,7 +10,7 @@ import { formatErrorForTool } from '../utils/error-handler.js';
 import { failureHints, renderHints } from '../utils/failure-enrichment.js';
 import { preflightFieldValidation } from '../utils/field-validation.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const CREATE_RECORD_TOOL = {
 	name: 'servicenow_create_record',
@@ -18,11 +18,9 @@ export const CREATE_RECORD_TOOL = {
 	description: `What: Insert a new record into a ServiceNow table.
 When to use: To create data records (incident, sys_user, etc.). Do NOT use it to author app metadata (business rules, ACLs, UI policies) — that belongs in the Fluent SDK.
 Preconditions: Write-enabled instance (readOnly: false); field names valid for the table (validated automatically).
-Produces: The created record with its sys_id.
+Produces: sys_id plus the fields you set (not the whole freshly-created row).
 
-Examples:
-- tableName="incident", fields={"short_description":"Network down","priority":"2"}
-- tableName="sys_user", fields={"user_name":"john.doe","email":"john.doe@example.com"}`,
+Example: tableName="incident", fields={"short_description":"Network down","priority":"2"}`,
 	inputSchema: CreateRecordSchema,
 	outputSchema: CreateRecordOutputSchema,
 };
@@ -57,24 +55,22 @@ export function createCreateRecordTool(tableService: TableService, schemaService
 					validated.instance,
 				);
 
-				// Format response for LLM
+				// Lean echo: sys_id + the fields the caller set, not the whole freshly
+				// created row (dozens of system defaults the caller can re-query if
+				// needed) — matches the batch services' small-echo choice.
+				const sysId = typeof record.sys_id === 'string' ? record.sys_id : undefined;
+				const created: Record<string, unknown> = { sys_id: record.sys_id };
+				for (const k of Object.keys(validated.fields)) {
+					if (k in record) created[k] = record[k];
+				}
 				const response = {
 					success: true,
-					message: `Successfully created record in ${validated.tableName}`,
 					table: validated.tableName,
-					sys_id: record.sys_id,
-					record: record,
+					sys_id: sysId,
+					record: created,
 				};
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				return toolResult(response, `created ${validated.tableName} ${sysId ?? ''}`.trim());
 			} catch (error) {
 				logger.error('Error creating record', error);
 

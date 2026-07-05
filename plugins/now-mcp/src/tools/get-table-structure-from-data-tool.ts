@@ -24,9 +24,7 @@ When to use: As a fallback for servicenow_get_table_schema when the sys_dictiona
 Preconditions: Read access; the table must exist and contain records (an empty table yields no fields).
 Produces: recordsSampled, alwaysPopulated / neverPopulated field lists, referenceFields (with the referenced table when derivable from the reference link), and a fields array of {name, inferredType, populatedRatio, isReference, sampleValues}.
 
-Examples:
-- tableName="incident"
-- tableName="u_legacy_table", sampleSize=20`,
+Example: tableName="u_legacy_table", sampleSize=20 (sampleSize defaults to 5).`,
 	inputSchema: GetTableStructureFromDataSchema,
 	outputSchema: GetTableStructureFromDataOutputSchema,
 };

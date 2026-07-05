@@ -56,19 +56,17 @@ export const AggregateRecordsOutputSchema = z.object({
 	result: z.unknown(),
 });
 
-/** servicenow_create_record */
+/** servicenow_create_record — lean echo: sys_id + the fields the caller set. */
 export const CreateRecordOutputSchema = z.object({
 	success: z.boolean(),
-	message: z.string(),
 	table: z.string(),
 	sys_id: z.string().optional(),
 	record: OpenRecord,
 });
 
-/** servicenow_update_record */
+/** servicenow_update_record — lean echo: sys_id + the fields the caller changed. */
 export const UpdateRecordOutputSchema = z.object({
 	success: z.boolean(),
-	message: z.string(),
 	table: z.string(),
 	sys_id: z.string().optional(),
 	updateType: z.string().optional(),
@@ -88,7 +86,6 @@ export const DeleteRecordOutputSchema = z.object({
 /** Shared batch result envelope (create + update). */
 export const BatchOutputSchema = z.object({
 	success: z.boolean(),
-	message: z.string(),
 	table: z.string(),
 	instance: z.string(),
 	updateType: z.string().optional(),
@@ -96,7 +93,6 @@ export const BatchOutputSchema = z.object({
 		total: z.number(),
 		successCount: z.number(),
 		failureCount: z.number(),
-		successRate: z.string(),
 	}),
 	results: z.array(OpenRecord),
 });
@@ -122,6 +118,8 @@ export const GetTableSchemaOutputSchema = z.object({
 	extends: z.preprocess(normalizeSNRef, z.string().optional()),
 	fieldCount: z.number(),
 	fields: z.array(OpenRecord),
+	// True when a very wide table's fields were capped at a field boundary.
+	fieldsTruncated: z.boolean().optional(),
 	instance: z.string(),
 });
 

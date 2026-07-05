@@ -147,6 +147,19 @@ test('aggregateRecords builds Stats params and hits the stats endpoint', async (
   assert.equal(call.params.sysparm_display_value, true);
 });
 
+test('getRecord requests exclude-reference-link to trim {value,display_value,link} noise', async () => {
+  const rec = { sys_id: 'd'.repeat(32), number: 'INC0009' };
+  const client = makeStubClient({ get: { result: rec } });
+  const svc = new TableService(makeManager(client));
+
+  const out = await svc.getRecord('incident', 'd'.repeat(32), ['number']);
+  assert.deepEqual(out, rec);
+  const call = client.calls[0];
+  assert.equal(call.method, 'get');
+  assert.equal(call.params.sysparm_exclude_reference_link, true);
+  assert.equal(call.params.sysparm_fields, 'number');
+});
+
 test('createRecord POSTs to the table endpoint and returns the result', async () => {
   const created = { sys_id: 'b'.repeat(32), number: 'INC0001' };
   const client = makeStubClient({ post: { result: created } });

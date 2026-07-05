@@ -6,9 +6,8 @@ import { GetChoiceListOutputSchema } from '../schemas/output-schemas.js';
 import { GetChoiceListSchema } from '../schemas/schema-schemas.js';
 import type { SchemaService } from '../services/schema-service.js';
 import { toolError } from '../utils/error-handler.js';
-import { renderHints } from '../utils/failure-enrichment.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const GET_CHOICE_LIST_TOOL = {
 	name: 'servicenow_get_choice_list',
@@ -57,22 +56,20 @@ export function createGetChoiceListTool(schemaService: SchemaService) {
 				};
 
 				// An empty choice list usually means a misspelled or non-choice field —
-				// steer the caller to the schema rather than returning a silent [].
-				const hints =
-					choices.length === 0
-						? renderHints([
-								`No choices for '${validated.fieldName}' on '${validated.tableName}'. It may not be a choice field, or the name is wrong — check servicenow_get_table_schema for the exact field name and type.`,
-							])
-						: null;
-				if (hints) response.hints = hints;
+				// steer the caller to the schema rather than returning a silent []. The
+				// hint lives in the structured body only (no duplicate text block).
+				if (choices.length === 0) {
+					response.hints = [
+						`No choices for '${validated.fieldName}' on '${validated.tableName}'. It may not be a choice field, or the name is wrong — check servicenow_get_table_schema for the exact field name and type.`,
+					];
+				}
 
-				return {
-					content: [
-						{ type: 'text' as const, text: toolText(response) },
-						...(hints ? [{ type: 'text' as const, text: hints }] : []),
-					],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`${choices.length} choice(s) for ${validated.tableName}.${validated.fieldName}${
+						choices.length === 0 ? ' — see hints' : ''
+					}`,
+				);
 			} catch (error) {
 				logger.error('Error getting choice list', error);
 				return toolError(error, { table: tableName });

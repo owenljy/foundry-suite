@@ -4,6 +4,14 @@
 
 import { z } from 'zod';
 import { maxBatchSize } from '../config/batch-config.js';
+import {
+	continueOnErrorField,
+	instanceField,
+	skipFieldValidationField,
+	sysIdField,
+	tableNameField,
+	updateTypeField,
+} from './common.js';
 
 /**
  * Enforce the configured max-batch-size cap at parse time, reporting the actual
@@ -28,14 +36,8 @@ function enforceBatchSize(items: unknown[], ctx: z.RefinementCtx): void {
  * Schema for batch creating multiple records
  */
 export const BatchCreateSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	records: z
 		.array(
 			z.record(z.unknown()).refine((data) => Object.keys(data).length > 0, {
@@ -45,18 +47,8 @@ export const BatchCreateSchema = z.object({
 		.min(1, 'At least one record is required')
 		.superRefine(enforceBatchSize)
 		.describe('Array of record objects to create'),
-	continueOnError: z
-		.boolean()
-		.default(true)
-		.describe(
-			'If true (default), keep creating remaining records after a failure. If false, stop before the next concurrency batch once any record fails — records already dispatched in the current batch (up to 25) still complete.',
-		),
-	skipFieldValidation: z
-		.boolean()
-		.optional()
-		.describe(
-			'Skip the pre-flight field-name validation against the table schema (e.g. for a field not present in the cached dictionary)',
-		),
+	continueOnError: continueOnErrorField,
+	skipFieldValidation: skipFieldValidationField,
 });
 
 export type BatchCreateInput = z.infer<typeof BatchCreateSchema>;
@@ -65,21 +57,12 @@ export type BatchCreateInput = z.infer<typeof BatchCreateSchema>;
  * Schema for batch updating multiple records
  */
 export const BatchUpdateSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	updates: z
 		.array(
 			z.object({
-				sysId: z
-					.string()
-					.length(32, 'sys_id must be exactly 32 characters')
-					.regex(/^[a-f0-9]{32}$/i, 'sys_id must be a valid hexadecimal string'),
+				sysId: sysIdField(),
 				fields: z.record(z.unknown()).refine((data) => Object.keys(data).length > 0, {
 					message: 'Fields object must have at least one field',
 				}),
@@ -88,22 +71,9 @@ export const BatchUpdateSchema = z.object({
 		.min(1, 'At least one update is required')
 		.superRefine(enforceBatchSize)
 		.describe('Array of update objects with sysId and fields'),
-	updateType: z
-		.enum(['partial', 'full'])
-		.default('partial')
-		.describe('partial = PATCH (update only provided fields), full = PUT (replace entire record)'),
-	continueOnError: z
-		.boolean()
-		.default(true)
-		.describe(
-			'If true (default), keep updating remaining records after a failure. If false, stop before the next concurrency batch once any record fails — records already dispatched in the current batch (up to 25) still complete.',
-		),
-	skipFieldValidation: z
-		.boolean()
-		.optional()
-		.describe(
-			'Skip the pre-flight field-name validation against the table schema (e.g. for a field not present in the cached dictionary)',
-		),
+	updateType: updateTypeField,
+	continueOnError: continueOnErrorField,
+	skipFieldValidation: skipFieldValidationField,
 });
 
 export type BatchUpdateInput = z.infer<typeof BatchUpdateSchema>;

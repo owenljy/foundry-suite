@@ -3,19 +3,20 @@
  */
 
 import { z } from 'zod';
+import {
+	instanceField,
+	skipFieldValidationField,
+	sysIdField,
+	tableNameField,
+	updateTypeField,
+} from './common.js';
 
 /**
  * Schema for querying records from a ServiceNow table
  */
 export const QueryRecordsSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	query: z.string().optional().describe('Encoded query string (e.g., "priority=1^state=2")'),
 	limit: z
 		.number()
@@ -59,14 +60,8 @@ export type QueryRecordsInput = z.infer<typeof QueryRecordsSchema>;
  * Schema for aggregating records via the Stats API
  */
 export const AggregateRecordsSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	query: z
 		.string()
 		.optional()
@@ -100,18 +95,9 @@ export type AggregateRecordsInput = z.infer<typeof AggregateRecordsSchema>;
  * Schema for getting a single record by sys_id
  */
 export const GetRecordSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
-	sysId: z
-		.string()
-		.length(32, 'sys_id must be exactly 32 characters')
-		.regex(/^[a-f0-9]{32}$/i, 'sys_id must be a valid hexadecimal string'),
+	instance: instanceField,
+	tableName: tableNameField(),
+	sysId: sysIdField(),
 	fields: z
 		.array(z.string())
 		.optional()
@@ -124,27 +110,15 @@ export type GetRecordInput = z.infer<typeof GetRecordSchema>;
  * Schema for creating a new record
  */
 export const CreateRecordSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	fields: z
 		.record(z.unknown())
 		.refine((data) => Object.keys(data).length > 0, {
 			message: 'At least one field must be provided',
 		})
 		.describe('Field-value pairs for the new record'),
-	skipFieldValidation: z
-		.boolean()
-		.optional()
-		.default(false)
-		.describe(
-			'Skip pre-flight field-name validation against the table schema (use if a valid field is being flagged)',
-		),
+	skipFieldValidation: skipFieldValidationField.default(false),
 });
 
 export type CreateRecordInput = z.infer<typeof CreateRecordSchema>;
@@ -153,35 +127,17 @@ export type CreateRecordInput = z.infer<typeof CreateRecordSchema>;
  * Schema for updating an existing record
  */
 export const UpdateRecordSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
-	sysId: z
-		.string()
-		.length(32, 'sys_id must be exactly 32 characters')
-		.regex(/^[a-f0-9]{32}$/i, 'sys_id must be a valid hexadecimal string'),
+	instance: instanceField,
+	tableName: tableNameField(),
+	sysId: sysIdField(),
 	fields: z
 		.record(z.unknown())
 		.refine((data) => Object.keys(data).length > 0, {
 			message: 'At least one field must be provided',
 		})
 		.describe('Field-value pairs to update'),
-	updateType: z
-		.enum(['partial', 'full'])
-		.default('partial')
-		.describe('partial = PATCH (update only provided fields), full = PUT (replace entire record)'),
-	skipFieldValidation: z
-		.boolean()
-		.optional()
-		.default(false)
-		.describe(
-			'Skip pre-flight field-name validation against the table schema (use if a valid field is being flagged)',
-		),
+	updateType: updateTypeField,
+	skipFieldValidation: skipFieldValidationField.default(false),
 });
 
 export type UpdateRecordInput = z.infer<typeof UpdateRecordSchema>;
@@ -190,18 +146,9 @@ export type UpdateRecordInput = z.infer<typeof UpdateRecordSchema>;
  * Schema for deleting a record
  */
 export const DeleteRecordSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
-	sysId: z
-		.string()
-		.length(32, 'sys_id must be exactly 32 characters')
-		.regex(/^[a-f0-9]{32}$/i, 'sys_id must be a valid hexadecimal string'),
+	instance: instanceField,
+	tableName: tableNameField(),
+	sysId: sysIdField(),
 });
 
 export type DeleteRecordInput = z.infer<typeof DeleteRecordSchema>;

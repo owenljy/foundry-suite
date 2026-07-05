@@ -14,7 +14,7 @@ import type { TableService } from '../services/table-service.js';
 import type { ServiceNowRecord } from '../types/servicenow.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const GET_SECURITY_INFO_TOOL = {
 	name: 'servicenow_get_security_info',
@@ -22,10 +22,7 @@ export const GET_SECURITY_INFO_TOOL = {
 	description: `What: A consolidated view of what protects a table — ACLs (access controls), the roles they require, active data policies, and security-related business rules.
 When to use: To understand why access to a table/field is granted or denied, or to audit a table's security posture, without querying each security table separately.
 Preconditions: The table should exist. Read access to the security metadata tables (sys_security_acl, sys_data_policy2, sys_script) — a section you cannot read is returned empty with a note in warnings, the call still succeeds.
-Produces: acls {total, byOperation, tableLevel, fieldLevel, details}, roleRequirements (ACL→role links), dataPolicies, securityBusinessRules, and warnings for any section that could not be read.
-
-Example:
-- tableName="incident"`,
+Produces: acls {total, byOperation, tableLevel, fieldLevel, details}, roleRequirements (ACL→role links), dataPolicies, securityBusinessRules, and warnings for any section that could not be read.`,
 	inputSchema: GetSecurityInfoSchema,
 	outputSchema: GetSecurityInfoOutputSchema,
 };
@@ -149,10 +146,12 @@ export function createGetSecurityInfoTool(tableService: TableService) {
 					response.warnings = warnings;
 				}
 
-				return {
-					content: [{ type: 'text' as const, text: toolText(response) }],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`${aclRecords.length} ACL(s), ${dataPolicyResult.records.length} data policy(ies) on ${t}${
+						warnings.length > 0 ? ' — see warnings' : ''
+					}`,
+				);
 			} catch (error) {
 				logger.error('Error getting security info', error);
 				return toolError(error, { table: tableName, operation: 'get security info' });

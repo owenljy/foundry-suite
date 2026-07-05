@@ -3,15 +3,13 @@
  */
 
 import { z } from 'zod';
+import { instanceField } from './common.js';
 
 /**
  * Schema for executing arbitrary background scripts via sys_trigger
  */
 export const ExecuteBackgroundScriptSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
+	instance: instanceField,
 	script: z
 		.string()
 		.min(1, 'Script code is required')

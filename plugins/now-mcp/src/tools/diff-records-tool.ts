@@ -6,7 +6,7 @@ import { DiffRecordsOutputSchema, DiffRecordsSchema } from '../schemas/diff-sche
 import type { TableService } from '../services/table-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const DIFF_RECORDS_TOOL = {
 	name: 'servicenow_diff_records',
@@ -14,11 +14,7 @@ export const DIFF_RECORDS_TOOL = {
 	description: `What: Compare two records on the same table field-by-field and report only the fields that differ.
 When to use: To see what changed between two records (e.g. a record and its clone, or two similar incidents) without fetching both and diffing by hand.
 Preconditions: Read access; both sys_ids must exist on the given table.
-Produces: fieldsCompared (union of field names inspected), fieldsChanged, and diffs — a map of each changed field to its two values {a (record A), b (record B)}. Restrict the comparison with the optional fields[] argument.
-
-Examples:
-- tableName="incident", sysIdA="<32 hex>", sysIdB="<32 hex>"
-- tableName="change_request", sysIdA="<32 hex>", sysIdB="<32 hex>", fields=["state","assigned_to"]`,
+Produces: fieldsCompared (union of field names inspected), fieldsChanged, and diffs — a map of each changed field to its two values {a (record A), b (record B)}. Restrict the comparison with the optional fields[] argument.`,
 	inputSchema: DiffRecordsSchema,
 	outputSchema: DiffRecordsOutputSchema,
 };
@@ -76,10 +72,10 @@ export function createDiffRecordsTool(tableService: TableService) {
 					diffs,
 				};
 
-				return {
-					content: [{ type: 'text' as const, text: toolText(response) }],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`${Object.keys(diffs).length} field(s) differ of ${keys.size} on ${validated.tableName}`,
+				);
 			} catch (error) {
 				logger.error('Error diffing records', error);
 				return toolError(error, { table: tableName, operation: 'diff records' });

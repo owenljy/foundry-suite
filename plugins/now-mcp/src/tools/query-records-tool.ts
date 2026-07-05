@@ -8,7 +8,7 @@ import type { TableService } from '../services/table-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { zeroResultHints } from '../utils/failure-enrichment.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 /**
  * Render guardrail — independent of the requested `limit` (which the schema caps
@@ -61,20 +61,11 @@ When to use: To retrieve the rows themselves — show me / fetch / find matching
 Preconditions: Table must exist; the account needs read access to it.
 Produces: An array of the matching records (plus pagination metadata, and recovery hints when empty).
 
-Pass a ServiceNow encoded query in the query parameter.
-
-Prefer passing the fields parameter — wide tables return 100+ columns per row
-otherwise, which floods context and truncates the result.
+Encoded query goes in the query param (operators: = != ^ ^OR > < >= <= LIKE STARTSWITH ENDSWITH IN ISEMPTY ISNOTEMPTY; dot-walk reference fields, e.g. caller_id.department.name=Network).
 
 Examples:
-- Filter + fields: tableName="incident", query="priority=1^state=2", fields=["number","short_description","priority"]
-- Unassigned + critical: tableName="incident", query="assigned_toISEMPTY^priority=1", fields=["number","short_description"]
-- Pagination: tableName="incident", limit=50, offset=100 (response.pagination.hasMore / totalMatching guide the next page)
-
-Encoded operators: = != ^ (AND) ^OR > < >= <= LIKE STARTSWITH ENDSWITH IN ISEMPTY ISNOTEMPTY.
-Dot-walking: traverse reference fields with dots in both query and fields, e.g.
-query="caller_id.department.name=Network", fields=["caller_id.department.manager.email"].
-Set displayValue=true for human-readable labels of reference/choice fields, or "all" for both.`,
+- tableName="incident", query="priority=1^state=2", fields=["number","short_description"]
+- Pagination: limit=50, offset=100 (response.pagination.hasMore / totalMatching guide the next page)`,
 	inputSchema: QueryRecordsSchema,
 	outputSchema: QueryRecordsOutputSchema,
 };
@@ -159,40 +150,28 @@ export function createQueryRecordsTool(tableService: TableService) {
 					});
 				}
 
-				// Compact + char-capped serialization (from main) layered on top of the
-				// row/byte render guardrail above — both keep tool-result context small.
-				const content = [
-					{
-						type: 'text' as const,
-						text: toolText(response),
-					},
-				];
-				if (truncated) {
-					content.push({
-						type: 'text' as const,
-						text:
-							`Note: the result was truncated — showing ${renderedRows.length} of ${fetchedCount} fetched rows ` +
-							`(render cap ${MAX_RETURNED_ROWS} rows / ${MAX_SERIALIZED_BYTES} bytes). ` +
-							`Narrow the query to see the rest: add filters, select fewer fields, or use servicenow_aggregate_records for counts/group-by.`,
-					});
-				}
+				// Thin text summary; the rows live in structuredContent (which the caller
+				// receives) so we don't pay for the payload twice. The render guardrail
+				// above already capped what goes into `records`.
+				const totalNote = totalMatching !== null ? ` of ${totalMatching} matching` : '';
+				const summary = `${fetchedCount} row(s)${totalNote} on ${validated.tableName}${
+					truncated ? ` (truncated to ${renderedRows.length})` : ''
+				}${records.length === 0 ? ' — see hints' : ''}`;
 
-				return {
-					content,
-					structuredContent: response,
-					// Result-level metadata, separate from the text body (WS-B §4.2).
-					_meta: {
-						instance: validated.instance || 'default',
-						durationMs,
-						// Rows actually returned to the caller after the render cap.
-						rowCount: renderedRows.length,
-						// Rows fetched in this page before the cap; equals rowCount when not truncated.
-						fetchedCount,
-						// Rows matching the query across all pages (null if X-Total-Count absent).
-						totalMatching,
-						truncated,
-					},
-				};
+				const extraText = truncated
+					? [
+							`Note: the result was truncated — showing ${renderedRows.length} of ${fetchedCount} fetched rows ` +
+								`(render cap ${MAX_RETURNED_ROWS} rows / ${MAX_SERIALIZED_BYTES} bytes). ` +
+								`Narrow the query to see the rest: add filters, select fewer fields, or use servicenow_aggregate_records for counts/group-by.`,
+						]
+					: undefined;
+
+				// _meta carries only genuinely result-level fields (WS-B §4.2); counts and
+				// truncation flags already live in the body, so they are not duplicated here.
+				return toolResult(response, summary, {
+					meta: { instance: validated.instance || 'default', durationMs },
+					extraText,
+				});
 			} catch (error) {
 				logger.error('Error querying records', error);
 				return toolError(error, { table: tableName, query: undefined, operation: 'query' });

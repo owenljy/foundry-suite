@@ -3,24 +3,40 @@
  */
 
 import { GetTableSchemaOutputSchema } from '../schemas/output-schemas.js';
+import type { FieldMetadata } from '../schemas/schema-schemas.js';
 import { GetTableSchemaSchema } from '../schemas/schema-schemas.js';
 import type { SchemaService } from '../services/schema-service.js';
 import { toolError } from '../utils/error-handler.js';
-import { renderHints } from '../utils/failure-enrichment.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
+
+/** ~200 KB of serialized fields before trailing ones are dropped with a note. */
+const MAX_FIELDS_BYTES = 200_000;
+
+/**
+ * Compact a field for the wire: keep name/type always; include mandatory/readOnly
+ * only when true (the common case is false, so emitting `false` is pure noise —
+ * matches how maxLength/reference are already omitted when empty); drop the human
+ * `label` (rarely needed to build a query and roughly doubles per-field bytes).
+ */
+function compactField(f: FieldMetadata): Record<string, unknown> {
+	const out: Record<string, unknown> = { name: f.name, type: f.type };
+	if (f.mandatory) out.mandatory = true;
+	if (f.readOnly) out.readOnly = true;
+	if (f.maxLength !== undefined) out.maxLength = f.maxLength;
+	if (f.reference) out.reference = f.reference;
+	return out;
+}
 
 export const GET_TABLE_SCHEMA_TOOL = {
 	name: 'servicenow_get_table_schema',
 	title: 'Get table schema',
-	description: `What: Get a ServiceNow table's fields and their data types — every field's name, label, type, mandatory/readonly flags, max length, and (for reference fields) the name of the table it points to.
+	description: `What: Get a ServiceNow table's fields and their data types — each field's name, type, mandatory/readonly flags (present only when true), max length, and (for reference fields) the table it points to.
 When to use: To discover what fields/columns and data types a table defines, before querying or writing. For the valid values of one choice field use servicenow_get_choice_list. To inspect a referenced table's own fields, call this tool again with that table name.
 Preconditions: Table must exist; the account needs read access.
-Produces: An array of field definitions (cached ~15 min in memory, up to 24h on disk).
+Produces: An array of field definitions (cached ~15 min in memory, up to 24h on disk). Set includeExtended=true to include inherited parent-table fields.
 
-Examples:
-- tableName="incident"
-- Include inherited fields from parent tables: tableName="incident", includeExtended=true`,
+Example: tableName="incident"`,
 	inputSchema: GetTableSchemaSchema,
 	outputSchema: GetTableSchemaOutputSchema,
 };
@@ -51,46 +67,59 @@ export function createGetTableSchemaTool(schemaService: SchemaService) {
 				// isn't readable — distinguish that from a genuinely empty schema so the
 				// model doesn't treat a typo'd table name as "table has no fields".
 				if (!schema.exists) {
-					const hints = renderHints([
-						`No schema found for '${validated.tableName}'. The table may not exist or you may lack read access — verify the name with servicenow_list_tables.`,
-					]);
+					// Hint lives in the structured body only (not also a separate text
+					// block) — no double emission.
 					const notFound = {
 						success: false,
 						table: validated.tableName,
 						fieldCount: 0,
 						error: `Table '${validated.tableName}' not found or not readable`,
-						hints,
+						hints: [
+							`No schema found for '${validated.tableName}'. The table may not exist or you may lack read access — verify the name with servicenow_list_tables.`,
+						],
 					};
 					return {
-						content: [
-							{ type: 'text' as const, text: toolText(notFound) },
-							...(hints ? [{ type: 'text' as const, text: hints }] : []),
-						],
-						structuredContent: notFound,
+						...toolResult(notFound, `table '${validated.tableName}' not found or not readable`),
 						isError: true as const,
 					};
 				}
 
-				// Format response for LLM
-				const response = {
+				// Compact each field, then cap the serialized size so a very wide table
+				// (hundreds of fields) truncates cleanly at a field boundary instead of
+				// mid-JSON at the text-renderer's char cap.
+				const allFields = schema.fields.map(compactField);
+				let fields = allFields;
+				let fieldsTruncated = false;
+				if (Buffer.byteLength(JSON.stringify(fields)) > MAX_FIELDS_BYTES) {
+					let lo = 0;
+					let hi = fields.length;
+					while (lo < hi) {
+						const mid = Math.ceil((lo + hi) / 2);
+						if (Buffer.byteLength(JSON.stringify(fields.slice(0, mid))) <= MAX_FIELDS_BYTES) {
+							lo = mid;
+						} else {
+							hi = mid - 1;
+						}
+					}
+					fields = fields.slice(0, lo);
+					fieldsTruncated = true;
+				}
+
+				const response: Record<string, unknown> = {
 					success: true,
 					table: schema.name,
 					label: schema.label,
 					extends: schema.extends,
 					fieldCount: schema.fields.length,
-					fields: schema.fields,
+					fields,
 					instance: validated.instance || 'default',
 				};
+				if (fieldsTruncated) response.fieldsTruncated = true;
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				const summary = `${schema.fields.length} field(s) on ${schema.name}${
+					fieldsTruncated ? ` (showing ${fields.length})` : ''
+				}`;
+				return toolResult(response, summary);
 			} catch (error) {
 				logger.error('Error getting table schema', error);
 				return toolError(error, { table: tableName });

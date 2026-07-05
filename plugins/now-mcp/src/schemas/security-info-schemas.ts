@@ -3,20 +3,15 @@
  */
 
 import { z } from 'zod';
+import { instanceField, tableNameField } from './common.js';
 import { OpenRecord } from './output-schemas.js';
 
 /**
  * Schema for getting consolidated security info for a table.
  */
 export const GetSecurityInfoSchema = z.object({
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
+	tableName: tableNameField(),
+	instance: instanceField,
 });
 
 export type GetSecurityInfoInput = z.infer<typeof GetSecurityInfoSchema>;

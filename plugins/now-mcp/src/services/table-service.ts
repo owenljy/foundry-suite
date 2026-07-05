@@ -186,7 +186,10 @@ export class TableService {
 		const client = this.instanceManager.getClient(instance);
 		const endpoint = API_ENDPOINTS.TABLE_RECORD_BY_ID(tableName, sysId);
 
-		const params: Record<string, unknown> = {};
+		// Strip reference-link URL metadata (matches create/update) — otherwise
+		// reference fields come back as {value, display_value, link} noise, which
+		// diff_records and single reads would surface verbatim.
+		const params: Record<string, unknown> = { sysparm_exclude_reference_link: true };
 
 		if (fields && fields.length > 0) {
 			params.sysparm_fields = fields.join(',');

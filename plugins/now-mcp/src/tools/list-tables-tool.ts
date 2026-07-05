@@ -7,7 +7,7 @@ import { ListTablesSchema } from '../schemas/schema-schemas.js';
 import type { SchemaService } from '../services/schema-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const LIST_TABLES_TOOL = {
 	name: 'servicenow_list_tables',
@@ -48,7 +48,6 @@ export function createListTablesTool(schemaService: SchemaService) {
 					validated.instance,
 				);
 
-				// Format response for LLM
 				const response = {
 					success: true,
 					count: tables.length,
@@ -57,15 +56,10 @@ export function createListTablesTool(schemaService: SchemaService) {
 					tables: tables,
 				};
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`${tables.length} table(s)${validated.filter ? ` matching "${validated.filter}"` : ''}`,
+				);
 			} catch (error) {
 				logger.error('Error listing tables', error);
 				return toolError(error, { operation: 'list tables' });

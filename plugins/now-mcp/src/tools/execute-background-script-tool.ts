@@ -9,36 +9,20 @@ import type { ScriptService } from '../services/script-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
 import { detectWriteOperations, extractTableFieldRefs } from '../utils/script-analysis.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult, toolText } from '../utils/tool-response.js';
 
 export const EXECUTE_BACKGROUND_SCRIPT_TOOL = {
 	name: 'servicenow_execute_background_script',
 	title: 'Execute background script',
 	description: `What: Run server-side JavaScript in ServiceNow via a temporary sys_trigger, then return its logged output.
-When to use: For logic the Table/Stats APIs can't express. Prefer servicenow_query_records / servicenow_aggregate_records for plain reads.
-Preconditions: A WRITE-ENABLED instance (readOnly: false). The tool creates a temporary sys_trigger to run the script — that trigger is itself a write, so it will NOT run on a read-only instance, even for a read-only script. Also needs an admin/elevated role — the script runs with full system privileges. Configurable timeout (default 60s, max 2m).
+When to use: For logic the Table/Stats APIs can't express. Prefer query_records / aggregate_records for plain reads.
+Preconditions: A WRITE-ENABLED instance (the tool creates a temporary sys_trigger — itself a write — so it won't run on a read-only instance even for a read-only script) and an admin/elevated role (the script runs with full system privileges). Timeout default 60s, max 2m.
 
 WARNING: executes arbitrary code with full privileges; all executions are logged.
 
-Write policy (governs writes INSIDE the script body — separate from the instance needing to be write-enabled above):
-- The script body is treated as READ-ONLY by default. Any detected insert()/update()/delete() call is BLOCKED unless allowWrites: true is explicitly set.
-- allowWrites: true is the approval signal — only set it when the user has confirmed the writes are intentional.
-- Writes to metadata/config tables (sys_business_rule, sys_script_include, etc.) are flagged separately even when allowWrites: true — those belong in Fluent source control, not ad-hoc scripts.
-- Detection is heuristic (literal GlideRecord table names only); dynamic table references are not caught. When a write's table can't be resolved statically, the result carries a lowConfidenceWarning — the metadata-table check is incomplete, so review the script manually.
+Write policy (governs writes INSIDE the script body, separate from the instance being write-enabled): the body is READ-ONLY by default — a detected insert/update/delete is BLOCKED unless allowWrites:true (set only when the user has confirmed the writes). Writes to metadata/config tables (sys_business_rule, sys_script_include, …) are flagged even under allowWrites — those belong in Fluent source, not ad-hoc scripts. Detection is heuristic (literal GlideRecord table names only); an unresolvable table yields a lowConfidenceWarning — review manually.
 
-Runtime contract (runs in ServiceNow's Rhino engine, NOT Node):
-- Output capture: call log('...') to return output. gs.log()/gs.info()/gs.print() calls in your script are automatically rewritten to log() — all three work. Return values are discarded.
-- Logging in scoped contexts: default to gs.info(...), NOT gs.print(...). gs.print is a global-scope-only API — in scoped Script Includes or scoped background scripts it is blocked (calls fail or are silently swallowed). gs.info output lands in System Logs → System Log (syslog), not the background-script result panel.
-- No import/require/module system; synchronous only (no setTimeout/Promise/await).
-- Use GlideRecordSecure + canWrite() for writes; setLimit() your queries.
-- Referenced table/field names are checked against the live schema first; unknown names come back in a "schemaCheck" field (advisory — the script still runs).
-
-Example (read-only script body — allowWrites not needed; instance must still be write-enabled):
-  var gr = new GlideRecord('incident');
-  gr.addQuery('active', true);
-  gr.setLimit(5);
-  gr.query();
-  while (gr.next()) { log('INC: ' + gr.number); }`,
+Runtime (ServiceNow Rhino, NOT Node): call log(...) to return output (gs.log/info/print are rewritten to it; return values are discarded). In scoped contexts prefer gs.info over gs.print (print is global-scope-only). Synchronous only — no import/require, no setTimeout/Promise/await. Use GlideRecordSecure + canWrite() for writes and setLimit() on queries. Referenced table/field names are schema-checked first; unknown ones return in "schemaCheck" (advisory — the script still runs).`,
 	inputSchema: ExecuteBackgroundScriptSchema,
 	outputSchema: ExecuteScriptOutputSchema,
 };
@@ -135,15 +119,10 @@ export function createExecuteBackgroundScriptTool(
 						: 'Script execution failed. Check error details above.',
 				};
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					result.success ? 'script ran — see output' : 'script failed — see error',
+				);
 			} catch (error) {
 				logger.error('Error executing background script', error);
 				return toolError(error, { operation: 'execute background script' });

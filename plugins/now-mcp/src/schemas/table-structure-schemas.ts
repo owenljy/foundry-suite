@@ -8,19 +8,14 @@
  */
 
 import { z } from 'zod';
+import { instanceField, tableNameField } from './common.js';
 
 /**
  * Schema for inferring a table's structure from sampled data.
  */
 export const GetTableStructureFromDataSchema = z.object({
-	instance: z
-		.string()
-		.optional()
-		.describe('ServiceNow instance name (optional, uses default instance if not specified)'),
-	tableName: z
-		.string()
-		.min(1, 'Table name is required')
-		.regex(/^[a-z0-9_]+$/i, 'Table name should only contain letters, numbers, and underscores'),
+	instance: instanceField,
+	tableName: tableNameField(),
 	sampleSize: z
 		.number()
 		.int()
