@@ -97,8 +97,9 @@ Two ways to configure, depending on how complex your setup is:
 
 ```bash
 # 1. Copy the example (your copy is git-ignored, so credentials stay local).
-#    The template is bundled with the plugin at the same path, and viewable at
-#    https://github.com/owenljy/foundry-suite/blob/main/config/servicenow-instances.example.yaml
+#    The template is bundled with the plugin at config/servicenow-instances.example.yaml
+#    (relative to the plugin root), and viewable at
+#    https://github.com/owenljy/foundry-suite/blob/main/plugins/now-mcp/config/servicenow-instances.example.yaml
 cp config/servicenow-instances.example.yaml config/servicenow-instances.yaml
 # 2. Edit config/servicenow-instances.yaml — the file is commented; the minimal
 #    single-instance block at the top is all most setups need.
@@ -312,7 +313,7 @@ this checkout, build and register it at user scope pointing at your config:
 
 ```bash
 git clone <REPO_URL>
-cd now-mcp
+cd foundry-suite/plugins/now-mcp
 pnpm install
 pnpm build
 claude mcp add now-mcp -s user \

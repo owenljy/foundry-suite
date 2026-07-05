@@ -13,10 +13,10 @@ dist/
 .env.local
 
 # Configuration files with credentials (keep the example template tracked)
-config/servicenow-instances.*
-!config/servicenow-instances.example.*
-config/*.bak*
-config/NOTES.md
+plugins/now-mcp/config/servicenow-instances.*
+!plugins/now-mcp/config/servicenow-instances.example.*
+plugins/now-mcp/config/*.bak*
+plugins/now-mcp/config/NOTES.md
 
 # IDE
 .vscode/
