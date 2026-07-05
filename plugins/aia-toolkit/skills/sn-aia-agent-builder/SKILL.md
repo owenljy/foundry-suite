@@ -556,7 +556,7 @@ scripts/anti-pattern-scan.sh .
 ```
 Fix every "MUST be zero" hit — including **[10]** (all `Now.include`s resolve to a
 real `.js`/`.md` source, not `dist/` or a miscounted depth) and **[11]** (no
-duplicate `Now.ID`). **Add/confirm these v4 checks** (see Step "audit"):
+duplicate `Now.ID`). **Add/confirm these checks** (see Step "audit"):
 - no `Record({ table: 'sn_aia_*' })` where a typed API exists;
 - no 32-char hex literal in agent files (rule A2).
 

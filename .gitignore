@@ -13,8 +13,8 @@ dist/
 .env.local
 
 # Configuration files with credentials (keep the example template tracked)
-plugins/now-mcp/config/servicenow-instances.*
-!plugins/now-mcp/config/servicenow-instances.example.*
+plugins/now-mcp/config/sn-credential.*
+!plugins/now-mcp/config/sn-credential.example.*
 plugins/now-mcp/config/*.bak*
 plugins/now-mcp/config/NOTES.md
 

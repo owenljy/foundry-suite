@@ -1,7 +1,7 @@
 # foundry-suite — Claude's ServiceNow toolkit, built around Fluent (`now-sdk`)
 
 A Claude Code **plugin marketplace** for working on ServiceNow the Fluent way. It
-ships **two plugins** you can install separately or together, and it grows over
+ships **plugins** you can install separately or together, and it grows over
 time.
 
 | Plugin | What it is |
@@ -11,13 +11,13 @@ time.
 
 ## The idea in one paragraph
 
-Three layers, each with one job: **Fluent (`now-sdk`) authors** the application
-(tables, business rules, workflows) as source code and deploys it; **`now-mcp`
-operates** the running instance (query/aggregate data, read schema, write data
-rows, run server-side scripts, manage attachments); **skills orchestrate** the
-two into workflows. The line that keeps them apart: **data rows are runtime →
-MCP; config/metadata is the app's definition → Fluent source.** That's why the
-MCP writes an incident but never a business rule.
+* **No Wrapping, No Replacement:** We do **not** wrap, abstract, or replace `now-sdk` (Fluent). `now-sdk` remains the absolute, single source of truth for your application's definition, schema, and metadata.
+* **Separation of Concerns:** 
+  * **Fluent (`now-sdk`) defines the application** (the compile-time blueprint: tables, business rules, ACLs, workflows) as source code.
+  * **`now-mcp` operates the running instance** (the runtime layer: querying records, reading live schema, writing data rows, executing server-side scripts, managing attachments).
+  * **Skills orchestrate the two** into seamless developer and agent workflows.
+* **The Boundary:** **Data rows are runtime (MCP); configuration/metadata is the app's definition (Fluent source).** This is why the MCP writes an incident, but *never* writes or modifies a business rule directly.
+
 
 ![SDK authors the application, MCP operates the running instance, Skills orchestrate the two — with a "where does it go?" guide](docs/three-layers.png)
 
