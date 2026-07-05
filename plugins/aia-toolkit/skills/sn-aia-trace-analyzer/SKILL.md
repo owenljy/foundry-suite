@@ -104,364 +104,31 @@ Use the launch-and-poll script from [`references/background-scripts.md`](referen
 
 ## Phase 2: Trace Analysis
 
-Once you have the execution plan sys_id, run these checks. Resolve `read_records` and use it, otherwise provide background scripts.
+Once you have the execution plan sys_id, walk the trace **in order**, Step 1 → Step 10.
+For each step: resolve `read_records` and run the query in
+[`references/trace-walk.md`](references/trace-walk.md), reading the result against that step's
+interpretation table there. If no MCP tool resolves, use the matching background script in
+[`references/background-scripts.md`](references/background-scripts.md) instead.
 
-> **On `GlideRecord` vs `GlideRecordSecure`:** the background scripts below are **read-only diagnostics** run interactively by an admin in Scripts > Background — they intentionally use plain `GlideRecord` to see all trace records regardless of ACLs. This is the opposite of the tool-script rule (`CLAUDE.md` mandates `GlideRecordSecure` for deployed tool scripts because those run as the agent's user). Do not "fix" these diagnostic scripts to `GlideRecordSecure` — that would hide records you need to see.
+> **On `GlideRecord` vs `GlideRecordSecure`:** the background scripts are **read-only diagnostics** run interactively by an admin in Scripts > Background — they intentionally use plain `GlideRecord` to see all trace records regardless of ACLs. This is the opposite of the tool-script rule (`CLAUDE.md` mandates `GlideRecordSecure` for deployed tool scripts because those run as the agent's user). Do not "fix" these diagnostic scripts to `GlideRecordSecure` — that would hide records you need to see.
 
-### Step 1: Execution Plan Overview
-
-**What to check:** State, state_reason, timing, run_type, platform-computed latency metrics.
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_execution_plan
-  query: sys_id=<plan_sys_id>
-  fields: ["sys_id","objective","state","state_reason","run_type","execution_time_ms","start_time","end_time","gen_ai_usage_log","llm_p95_latency","tool_p95_latency","llm_token_avg"]
-  limit: 1
-```
-
-#### No match found — see [`references/background-scripts.md#step-1`](references/background-scripts.md#step-1--execution-plan-overview)
-
-**Interpret the state:**
-
-| State | Meaning |
-|---|---|
-| `completed` | Normal finish — check if the *output* was correct |
-| `terminated` | Abnormal end — check `state_reason` below |
-| `in_progress` | Still running or stuck |
-| `gatherData` | Waiting for user input — won't complete without interaction |
-
-**Interpret state_reason (for terminated runs):**
-
-| `state_reason` | Meaning | Next step |
+| Step | Table | What it tells you |
 |---|---|---|
-| `no_activity` | Timeout — nothing happened for too long | Check last execution task |
-| `execution_failed` | A tool or step threw an error | Check tool executions |
-| `planning_failed` | LLM couldn't produce a usable plan | Check LLM logs |
-| `user_exited` | User left the conversation (not a bug) | No action needed |
-| `live_agent_requested` | Handed off to a human | Check if this was intentional |
-| `fallback_redirected` | Routed elsewhere by fallback config | Check fallback configuration |
-| `security_violation` | ACL / permission failure | Check access verification task |
-
----
-
-### Step 2: Walk the Execution Task Tree
-
-**What to check:** Every step the agent took, in order. Find the first error or the last task (where it got stuck).
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_execution_task
-  query: execution_plan=<plan_sys_id>^ORDERBYorder
-  fields: ["sys_id","type","description","status","order","output","metadata","target_document_table","target_document_id","parent"]
-  limit: 50
-```
-
-#### No match found — see [`references/background-scripts.md#step-2`](references/background-scripts.md#step-2--walk-the-execution-task-tree)
-
-**Execution task types:**
-
-| `type` | What it represents | What to look for |
-|---|---|---|
-| `access_verification` | Initial ACL gate | If status=error, user/agent lacks permission |
-| `agent` | Agent reasoning loop | Parent container for gen_ai + tool tasks |
-| `gen_ai` | One LLM call (the "think" step) | Check Output for the agent's reasoning |
-| `tool` | A tool invocation | Cross-reference Tool Execution record |
-| `communicator` | Agent asking the user a question | Check if this was expected |
-| `manager` | Plan-management housekeeping | Usually not the problem |
-
-**Execution task status indicators:**
-
-| Status | Severity | Meaning |
-|---|---|---|
-| `completed` | OK | Task finished normally |
-| `error` | ERROR | Task failed — this is where things went wrong |
-| `cancelled` | ERROR | Task was cancelled |
-| `queued` | WARNING | Task is waiting to run |
-| `ready` | WARNING | Task is ready but hasn't started |
-| `ongoing` | WARNING | Task is still running |
-
-**Reading the trace:**
-1. Sort by `order` — read top-to-bottom
-2. The first task with `status = error` is where things went wrong
-3. If no error but the run is stuck, the *last* task shows where it stopped
-4. For `gen_ai` tasks, the `output` field contains the LLM's structured reasoning (JSON nested in JSON — may need pretty-printing)
-5. Check `parent` field to understand task nesting — `gen_ai` tasks are children of `agent` tasks
-6. Count `gen_ai` tasks to determine **ReAct iterations** — each one is a reason-act loop
-
----
-
-### Step 3: Inspect Tool Executions
-
-**What to check:** Raw request/response for every tool call. This is where you see exactly what was sent to and returned from flows, scripts, and capabilities.
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_tools_execution
-  query: execution_plan_id=<plan_sys_id>
-  fields: ["sys_id","request","response","execution_status","error_message","execution_time_ms","execution_mode","run_as_user","tool"]
-  limit: 20
-```
-
-#### No match found — see [`references/background-scripts.md#step-3`](references/background-scripts.md#step-3--inspect-tool-executions)
-
-**What to look for:**
-- `execution_status` — did the tool succeed or fail?
-- `error_message` — the actual error text
-- `request` — were the right parameters sent?
-- `response` — did the tool return what the agent expected?
-- **PHANTOM SUCCESS** — `execution_status = completed` but `response` is empty, `null`, `undefined`, `{}`, or the literal string `"undefined"`. The tool "succeeded" but returned no data, so the LLM downstream fabricates or emits placeholders. **This is the runtime signature of a script-tool that doesn't return a value on every path** — most often a tool authored with module syntax (`export function …`) or a compiled `dist/` bundle instead of a plain-JS IIFE. See the Runtime Contract in `/sn-aia-agent-builder` (and the `CLAUDE.md` "PLAIN-JS IIFE" blocker). The fix is in the tool script, not the agent.
-- `execution_time_ms` — is this tool slow?
-- `execution_mode` — `sync` vs `async` (async tools may have different timing characteristics)
-
-**Tool execution status indicators:**
-
-| Status | Severity | Meaning |
-|---|---|---|
-| `completed` | OK | Tool finished normally |
-| `error` | ERROR | Tool failed |
-| `timeout` | ERROR | Tool timed out |
-| `cancelled` | ERROR | Tool was cancelled |
-| `processing` | WARNING | Tool is still running |
-
----
-
-### Step 4: Inspect LLM Logs (with GAIC Error Code Interpretation)
-
-**What to check:** The actual prompt sent to the model, the model's response, error codes, token usage, and timing. This is the single most important table when the agent says something weird.
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sys_generative_ai_log
-  query: sys_created_onBETWEEN<start_time>@<end_time>
-  fields: ["sys_id","definition","prompt","response","error","error_code","time_taken","prompt_token_count","response_token_count","prompt_config_id","skill_config_id","output_metadata","started_at","completed_at"]
-  limit: 20
-```
-
-> **Note:** `sys_generative_ai_log` doesn't have a direct `execution_plan` foreign key. Filter by the time window of the execution plan (start_time to end_time) to find matching LLM calls. If the instance runs multiple agents concurrently, also filter by `conversation` if available.
-
-#### No match found — see [`references/background-scripts.md#step-4`](references/background-scripts.md#step-4--inspect-llm-logs)
-
-**What to look for in the `prompt` field:**
-- **`{{variable_name}}` literally in the text** — a variable failed to resolve
-- **Empty tool list** at the bottom of the prompt — agent has no tools wired up
-- **Missing system instructions** — the agent's role/instructions weren't injected
-- **Truncated conversation history** — context window exceeded, earlier turns dropped
-
-**What to look for in the `response` field:**
-- **Hallucinated tool names** — agent tried to call a tool that doesn't exist
-- **Wrong action format** — agent produced malformed JSON the orchestrator can't parse
-- **Refusal** — model refused to answer (safety filter)
-- **Empty response** — model returned nothing (check error_code)
-
-#### GAIC Error Code Reference
-
-When `error_code` is present in `sys_generative_ai_log`, look it up in [`references/gaic-error-codes.md`](references/gaic-error-codes.md) — covers pre-processing (100xxx), LLM request (200xxx), post-processing (300xxx), and pipeline (400xxx) codes with workarounds.
-
----
-
-### Step 5: Check AIA Messages
-
-**What to check:** Messages exchanged during the execution plan — user inputs, agent responses, history context, and user profile data.
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_message
-  query: execution_plan.sys_id=<plan_sys_id>
-  fields: ["sys_id","name","role","message","sys_created_on"]
-  limit: 30
-```
-
-#### No match found — see [`references/background-scripts.md#step-5`](references/background-scripts.md#step-5--check-aia-messages)
-
-**Message roles:**
-
-| Role | Meaning |
-|---|---|
-| `user` | User input message |
-| `agent` | Agent response |
-| `history` | Conversation history context |
-| `user_profile` | User profile data injected as context |
-
-**What to look for:**
-- Are user messages being captured correctly?
-- Is the agent's response matching what the user saw?
-- Is conversation history growing too large (context window pressure)?
-- Is user profile data being injected when expected?
-
----
-
-### Step 6: Check Platform Errors (Syslog)
-
-**What to check:** Platform-level errors stamped with the execution plan ID.
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: syslog
-  query: sourceLIKEsn_aia^messageLIKE<plan_sys_id>^level=0
-  fields: ["sys_id","level","source","message","sys_created_on"]
-  limit: 20
-```
-
-Also check broader AIA errors in the time window:
-```
-servicenow_query_records
-  tableName: syslog
-  query: sourceSTARTSWITHsn_aia^level=0^sys_created_onBETWEEN<start_time>@<end_time>
-  fields: ["sys_id","level","source","message","sys_created_on"]
-  limit: 20
-```
-
-#### No match found — see [`references/background-scripts.md#step-6`](references/background-scripts.md#step-6--check-platform-errors-syslog)
-
----
-
-### Step 7: Performance Analysis
-
-**What to check:** Timing spans for every LLM call, tool execution, script execution, and user wait.
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_perf_event
-  query: execution_plan=<plan_sys_id>^ORDERBYDESCduration_ms
-  fields: ["sys_id","event_category","duration_ms","sequence","description"]
-  limit: 20
-```
-
-#### No match found — see [`references/background-scripts.md#step-7`](references/background-scripts.md#step-7--performance-analysis)
-
-**Performance event categories:**
-
-| Category | What it times |
-|---|---|
-| `llm_call` | One round-trip to the LLM |
-| `tool_execution` | One tool invocation |
-| `script_execution` | A script tool's execution |
-| `user_interaction` | Time waiting for user reply |
-| `workflow_control` | Plan-level state transitions |
-| `topic_switch` | Conversation topic change |
-| `subflow_call` | Flow/subflow dispatch |
-
-**Interpreting results:**
-- Sort by `duration_ms` DESC — the top entry is the bottleneck
-- If `llm_call` dominates, the model is slow (check model config, context length)
-- If `tool_execution` dominates, a specific tool is slow (check the tool script)
-- If `user_interaction` dominates, the agent spent most time waiting for the user (not a performance issue)
-- Compute **Orchestration Overhead** = Total Duration - LLM Time - Tool Time. If this is high, the platform routing/orchestration is the bottleneck.
-
-> **Note:** Performance events are only captured if `sn_aia.enable_perf_logs = true`. If no events are found, check this system property.
-
----
-
-### Step 8: Check User Feedback (optional)
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_execution_feedback
-  query: execution_plan=<plan_sys_id>
-  fields: ["sys_id","rating","feedback_text","sys_created_on"]
-  limit: 5
-```
-
----
-
-### Step 9: Check External Agent Calls (if applicable)
-
-If the agent talks to external agents (A2A/MCP), check these tables:
-
-#### Resolve `read_records`:
-```
-servicenow_query_records
-  tableName: sn_aia_external_agent_exec_history
-  query: execution_plan=<plan_sys_id>
-  fields: ["sys_id","request","response","status","duration_ms"]
-  limit: 10
-```
-
-```
-servicenow_query_records
-  tableName: sn_aia_external_agent_callback_registry
-  query: execution_plan=<plan_sys_id>
-  fields: ["sys_id","expected_at","received_at","status"]
-  limit: 10
-```
-
-**What to look for:**
-- `expected_at` vs `received_at` — large gap means the external agent is slow or hung
-- `status` — did the callback complete?
-
----
-
-### Step 10: Conversational Framework Tables (Optional)
-
-> **When to use:** These tables are populated when the agent runs through the **Virtual Agent / Now Assist conversational framework** (e.g., via Now Assist panel, Virtual Agent widget). Skip this step if the agent was invoked directly via API or background script.
-
-#### Conversation Tasks
-
-```
-servicenow_query_records
-  tableName: sys_cs_conversation_task
-  query: conversation=<conversation_sys_id>
-  fields: ["sys_id","topic_type","state","calling_task","context","sys_created_on","sys_updated_on"]
-  limit: 20
-```
-
-**Conversation task state indicators:**
-
-| State | Severity |
-|---|---|
-| `completed` | OK |
-| `faulted`, `canceled`, `abandoned`, `timedOut` | ERROR |
-| `init`, `greet`, `gatherData`, `invokeAction`, `confirm`, `actionInProgress`, `suspended` | WARNING (in-progress) |
-
-#### FDIH Invocations (Flow Designer Integration Hub)
-
-```
-servicenow_query_records
-  tableName: sys_cs_fdih_invocation
-  query: calling_cs_conversation_task.conversation.sys_id=<conversation_sys_id>
-  fields: ["sys_id","name","response_state","type","execution_mode","error","outputs","sys_created_on","sys_updated_on"]
-  limit: 20
-```
-
-**FDIH state indicators:**
-
-| State | Severity |
-|---|---|
-| `COMPLETE` | OK |
-| `ERROR`, `CANCELLED`, `TIMED_OUT` | ERROR |
-| `IN_PROGRESS` | WARNING |
-
-#### AIA Step Logs
-
-```
-servicenow_query_records
-  tableName: sys_cs_aia_step_log
-  query: conversation_id=<conversation_sys_id>
-  fields: ["sys_id","step_name","bundle_name","state","status","response","additional_args","parent_step","execution_plan_id","sys_created_on","sys_updated_on"]
-  limit: 30
-```
-
-**AIA step log state indicators:**
-
-| State/Status | Severity |
-|---|---|
-| `completed` | OK |
-| `errored`, `error`, `cancelled` | ERROR |
-| `pending`, `processing`, `skipped` | WARNING |
-
-**What to look for:**
-- Steps with empty `response` AND empty `additional_args` — indicates a step that produced no output
-- Steps in `errored` state — check `response` field for error details
-- `parent_step` field — builds a hierarchy of step execution
+| 1 — Execution Plan Overview | `sn_aia_execution_plan` | `state`/`state_reason`, timing, latency metrics — the run's verdict |
+| 2 — Execution Task Tree | `sn_aia_execution_task` | Every step in order; first `error` task = where it broke; last task = where it's stuck; `gen_ai` count = ReAct iterations |
+| 3 — Tool Executions | `sn_aia_tools_execution` | Raw request/response per tool call — including **phantom success** (see trace-walk.md definition) |
+| 4 — LLM Logs | `sys_generative_ai_log` | The actual prompt + response + GAIC `error_code` — the first stop when the agent says something weird |
+| 5 — AIA Messages | `sn_aia_message` | User inputs vs agent responses vs injected history/profile |
+| 6 — Platform Errors | `syslog` | Platform errors stamped with the plan ID |
+| 7 — Performance | `sn_aia_perf_event` | Timing spans; slowest span = bottleneck; LLM vs Tool vs Orchestration split |
+| 8 — User Feedback (opt) | `sn_aia_execution_feedback` | Thumbs / rating |
+| 9 — External Agent Calls (opt) | `sn_aia_external_agent_*` | A2A/MCP callback timing and status |
+| 10 — Conversational Framework (opt) | `sys_cs_*` | Only when run through Virtual Agent / Now Assist panel |
+
+**Completion criterion for Phase 2:** every non-optional step (1–7) has been queried and its
+result recorded, OR the walk stopped at the first `error`/stuck task with the cause identified.
+Do not proceed to Phase 3 with steps 1–7 unexamined. GAIC `error_code`s from Step 4 are decoded
+via [`references/gaic-error-codes.md`](references/gaic-error-codes.md).
 
 ---
 
@@ -476,7 +143,7 @@ After collecting data from Phase 2, run through this structured checklist before
 | 1 | Execution plan completed | `sn_aia_execution_plan` | `state` = `completed` | CRITICAL if not |
 | 2 | No execution task errors | `sn_aia_execution_task` | No tasks with `status` = `error` or `cancelled` | CRITICAL |
 | 3 | No tool execution failures | `sn_aia_tools_execution` | No tools with `execution_status` in (`error`, `timeout`, `cancelled`) | CRITICAL |
-| 4 | No GAIC error codes | `sys_generative_ai_log` | No records with non-empty `error_code` | CRITICAL — use error code reference above |
+| 4 | No GAIC error codes | `sys_generative_ai_log` | No records with non-empty `error_code` | CRITICAL — decode via [`references/gaic-error-codes.md`](references/gaic-error-codes.md) |
 | 5 | No LLM empty responses | `sys_generative_ai_log` | All records have non-empty `response` | WARNING |
 | 6 | No LLM error messages | `sys_generative_ai_log` | No records with non-empty `error` field (without error_code) | ERROR |
 | 7 | No syslog errors | `syslog` | No error-level entries in time window | WARNING |
@@ -523,7 +190,7 @@ After the diagnostic checklist, classify the issue using this decision tree:
 | **Agent emitted empty / placeholder / blank values despite tools "succeeding"** | Tool Execution (`sn_aia_tools_execution`) → `execution_status = completed` but `response` empty/`undefined` (phantom success) | The tool script returned `undefined`. Check it returns a value on every path; most often it used `export function`/`require`/a `dist/` bundle instead of a plain-JS IIFE — see Runtime Contract in `/sn-aia-agent-builder` |
 | **Agent says "I don't have any instructions or actions"** | LLM Log `prompt` field — the tool list section is empty | Check agent's tool wiring in AI Agent Studio |
 | **A tool failed** | Tool Execution filtered by plan → `execution_status` and `error_message` | Then Syslog around that timestamp |
-| **LLM returned an error code** | LLM Log `error_code` field → look up in GAIC Error Code Reference above | Follow the workaround for that specific code |
+| **LLM returned an error code** | LLM Log `error_code` field → look up in [`references/gaic-error-codes.md`](references/gaic-error-codes.md) | Follow the workaround for that specific code |
 | **Guardrail blocked the response** | LLM Log `error_code` = 300000/300100/300200/300300 | Check `sys_generative_ai_metric` for flagged categories |
 | **Run is stuck `in_progress` and never completes** | Execution Task for the plan, sort by `order` desc — last row shows where it stuck | Check Syslog around that time |
 | **Run is slow** | Performance Event for the plan, sort `duration_ms` desc | Identify the bottleneck category. Compute LLM vs Tool vs Orchestration split. |
