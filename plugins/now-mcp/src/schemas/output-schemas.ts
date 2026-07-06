@@ -18,7 +18,7 @@ import { z } from 'zod';
 export const OpenRecord = z.record(z.unknown());
 
 /**
- * servicenow_query_records
+ * sn_query_records
  *
  * `records` is the array actually returned to the caller, which may be a
  * truncated view of what the query matched (render guardrail — see the tool).
@@ -48,7 +48,7 @@ export const QueryRecordsOutputSchema = z.object({
 	hints: z.unknown().optional(),
 });
 
-/** servicenow_aggregate_records */
+/** sn_aggregate_records */
 export const AggregateRecordsOutputSchema = z.object({
 	success: z.boolean(),
 	table: z.string(),
@@ -56,7 +56,7 @@ export const AggregateRecordsOutputSchema = z.object({
 	result: z.unknown(),
 });
 
-/** servicenow_create_record — lean echo: sys_id + the fields the caller set. */
+/** sn_create_record — lean echo: sys_id + the fields the caller set. */
 export const CreateRecordOutputSchema = z.object({
 	success: z.boolean(),
 	table: z.string(),
@@ -64,7 +64,7 @@ export const CreateRecordOutputSchema = z.object({
 	record: OpenRecord,
 });
 
-/** servicenow_update_record — lean echo: sys_id + the fields the caller changed. */
+/** sn_update_record — lean echo: sys_id + the fields the caller changed. */
 export const UpdateRecordOutputSchema = z.object({
 	success: z.boolean(),
 	table: z.string(),
@@ -73,7 +73,7 @@ export const UpdateRecordOutputSchema = z.object({
 	record: OpenRecord,
 });
 
-/** servicenow_delete_record */
+/** sn_delete_record */
 export const DeleteRecordOutputSchema = z.object({
 	success: z.boolean(),
 	message: z.string().optional(),
@@ -110,7 +110,7 @@ function normalizeSNRef(val: unknown): string | undefined {
 	return undefined;
 }
 
-/** servicenow_get_table_schema */
+/** sn_get_table_schema */
 export const GetTableSchemaOutputSchema = z.object({
 	success: z.boolean(),
 	table: z.string(),
@@ -123,7 +123,7 @@ export const GetTableSchemaOutputSchema = z.object({
 	instance: z.string(),
 });
 
-/** servicenow_list_tables */
+/** sn_list_tables */
 export const ListTablesOutputSchema = z.object({
 	success: z.boolean(),
 	count: z.number(),
@@ -132,7 +132,7 @@ export const ListTablesOutputSchema = z.object({
 	tables: z.array(OpenRecord),
 });
 
-/** servicenow_get_choice_list */
+/** sn_get_choice_list */
 export const GetChoiceListOutputSchema = z.object({
 	success: z.boolean(),
 	table: z.string(),
@@ -142,7 +142,7 @@ export const GetChoiceListOutputSchema = z.object({
 	instance: z.string(),
 });
 
-/** servicenow_execute_background_script */
+/** sn_execute_background_script */
 export const ExecuteScriptOutputSchema = z.object({
 	success: z.boolean(),
 	executionTime: z.number().optional(),
@@ -162,21 +162,21 @@ export const ExecuteScriptOutputSchema = z.object({
 	warning: z.string().optional(),
 });
 
-/** servicenow_upload_attachment */
+/** sn_upload_attachment */
 export const UploadAttachmentOutputSchema = z.object({
 	success: z.boolean(),
 	message: z.string(),
 	attachment: OpenRecord,
 });
 
-/** servicenow_download_attachment */
+/** sn_download_attachment */
 export const DownloadAttachmentOutputSchema = z.object({
 	success: z.boolean(),
 	message: z.string(),
 	attachment: OpenRecord,
 });
 
-/** servicenow_sdk_status */
+/** sn_sdk_status */
 export const SdkStatusOutputSchema = z.object({
 	success: z.boolean(),
 	nowSdkVersion: z.string().nullable().optional(),

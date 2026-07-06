@@ -17,7 +17,7 @@ export function toolText(value: unknown): string {
 	return s.length <= MAX_TOOL_TEXT
 		? s
 		: s.slice(0, MAX_TOOL_TEXT) +
-				`\n…[truncated ${s.length - MAX_TOOL_TEXT} chars — narrow fields/limit or use servicenow_aggregate_records]`;
+				`\n…[truncated ${s.length - MAX_TOOL_TEXT} chars — narrow fields/limit or use sn_aggregate_records]`;
 }
 
 /** Shape of an MCP tool success result carrying structured output. */

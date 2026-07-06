@@ -39,7 +39,7 @@ source and redeploying — never treat the instance as the source of truth.
   API — in a scoped Script Include or scoped background script it is blocked (the call
   fails or is silently swallowed). Default to `gs.info(...)` everywhere; it works in both
   global and scoped contexts. Output lands in **System Logs → System Log (syslog)**, not
-  the background-script result panel. (The `servicenow_execute_background_script` MCP tool
+  the background-script result panel. (The `sn_execute_background_script` MCP tool
   auto-rewrites `gs.print`/`gs.info`/`gs.log` to its capture helper, so its result panel
   still shows output — but write `gs.info` in the source you keep.)
 

@@ -4,15 +4,15 @@ import { formatToolCall } from '../build/utils/tool-log.js';
 
 test('formatToolCall summarizes a successful call', () => {
   const { msg, data } = formatToolCall({
-    tool: 'servicenow_query_records',
+    tool: 'sn_query_records',
     durationMs: 42,
     ok: true,
   });
-  assert.match(msg, /servicenow_query_records/);
+  assert.match(msg, /sn_query_records/);
   assert.match(msg, /\bok\b/);
   assert.match(msg, /42ms/);
   assert.deepEqual(data, {
-    tool: 'servicenow_query_records',
+    tool: 'sn_query_records',
     durationMs: 42,
     ok: true,
   });
@@ -20,7 +20,7 @@ test('formatToolCall summarizes a successful call', () => {
 
 test('formatToolCall includes the instance when present', () => {
   const { msg, data } = formatToolCall({
-    tool: 'servicenow_create_record',
+    tool: 'sn_create_record',
     durationMs: 10,
     ok: true,
     instance: 'prod',
@@ -31,12 +31,12 @@ test('formatToolCall includes the instance when present', () => {
 
 test('formatToolCall summarizes an error call with the message', () => {
   const { msg, data } = formatToolCall({
-    tool: 'servicenow_update_record',
+    tool: 'sn_update_record',
     durationMs: 7,
     ok: false,
     error: 'boom',
   });
-  assert.match(msg, /servicenow_update_record/);
+  assert.match(msg, /sn_update_record/);
   assert.match(msg, /error/);
   assert.match(msg, /boom/);
   assert.equal(data.ok, false);
@@ -45,7 +45,7 @@ test('formatToolCall summarizes an error call with the message', () => {
 
 test('formatToolCall omits optional fields when absent', () => {
   const { data } = formatToolCall({
-    tool: 'servicenow_list_tables',
+    tool: 'sn_list_tables',
     durationMs: 5,
     ok: true,
   });
@@ -64,6 +64,6 @@ test('formatToolCall rounds and clamps the duration to a non-negative integer', 
 });
 
 test('formatToolCall is deterministic for identical input', () => {
-  const entry = { tool: 'servicenow_delete_record', durationMs: 99, ok: false, error: 'nope' };
+  const entry = { tool: 'sn_delete_record', durationMs: 99, ok: false, error: 'nope' };
   assert.deepEqual(formatToolCall(entry), formatToolCall(entry));
 });

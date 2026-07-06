@@ -7,7 +7,7 @@ background script is in [`background-scripts.md`](background-scripts.md).
 
 Every query block shows the illustrative param shape (`tableName` string, `query` encoded
 string, `fields` **array** of strings, `limit`) from the `servicenow` MCP's
-`servicenow_query_records` tool. Resolve `read_records` per
+`sn_query_records` tool. Resolve `read_records` per
 [`../../docs/mcp-capability-resolution.md`](../../docs/mcp-capability-resolution.md) against
 whatever MCP is actually connected, and adapt these param names to its real schema.
 
@@ -39,7 +39,7 @@ this definition.
 ## Step 1 — Execution Plan Overview
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_execution_plan
   query: sys_id=<plan_sys_id>
   fields: ["sys_id","objective","state","state_reason","run_type","execution_time_ms","start_time","end_time","gen_ai_usage_log","llm_p95_latency","tool_p95_latency","llm_token_avg"]
@@ -72,7 +72,7 @@ servicenow_query_records
 ## Step 2 — Walk the Execution Task Tree
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_execution_task
   query: execution_plan=<plan_sys_id>^ORDERBYorder
   fields: ["sys_id","type","description","status","order","output","metadata","target_document_table","target_document_id","parent"]
@@ -114,7 +114,7 @@ servicenow_query_records
 ## Step 3 — Inspect Tool Executions
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_tools_execution
   query: execution_plan_id=<plan_sys_id>
   fields: ["sys_id","request","response","execution_status","error_message","execution_time_ms","execution_mode","run_as_user","tool"]
@@ -144,7 +144,7 @@ servicenow_query_records
 ## Step 4 — Inspect LLM Logs (GAIC error codes)
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sys_generative_ai_log
   query: sys_created_onBETWEEN<start_time>@<end_time>
   fields: ["sys_id","definition","prompt","response","error","error_code","time_taken","prompt_token_count","response_token_count","prompt_config_id","skill_config_id","output_metadata","started_at","completed_at"]
@@ -174,7 +174,7 @@ pre-processing (100xxx), LLM request (200xxx), post-processing (300xxx), pipelin
 ## Step 5 — Check AIA Messages
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_message
   query: execution_plan.sys_id=<plan_sys_id>
   fields: ["sys_id","name","role","message","sys_created_on"]
@@ -196,7 +196,7 @@ history growing too large (context pressure)? user profile injected when expecte
 ## Step 6 — Check Platform Errors (Syslog)
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: syslog
   query: sourceLIKEsn_aia^messageLIKE<plan_sys_id>^level=0
   fields: ["sys_id","level","source","message","sys_created_on"]
@@ -205,7 +205,7 @@ servicenow_query_records
 
 Broader AIA errors in the time window:
 ```
-servicenow_query_records
+sn_query_records
   tableName: syslog
   query: sourceSTARTSWITHsn_aia^level=0^sys_created_onBETWEEN<start_time>@<end_time>
   fields: ["sys_id","level","source","message","sys_created_on"]
@@ -217,7 +217,7 @@ servicenow_query_records
 ## Step 7 — Performance Analysis
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_perf_event
   query: execution_plan=<plan_sys_id>^ORDERBYDESCduration_ms
   fields: ["sys_id","event_category","duration_ms","sequence","description"]
@@ -247,7 +247,7 @@ servicenow_query_records
 ## Step 8 — Check User Feedback (optional)
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_execution_feedback
   query: execution_plan=<plan_sys_id>
   fields: ["sys_id","rating","feedback_text","sys_created_on"]
@@ -259,7 +259,7 @@ servicenow_query_records
 ## Step 9 — Check External Agent Calls (A2A/MCP, if applicable)
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_external_agent_exec_history
   query: execution_plan=<plan_sys_id>
   fields: ["sys_id","request","response","status","duration_ms"]
@@ -267,7 +267,7 @@ servicenow_query_records
 ```
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_external_agent_callback_registry
   query: execution_plan=<plan_sys_id>
   fields: ["sys_id","expected_at","received_at","status"]
@@ -287,7 +287,7 @@ servicenow_query_records
 
 **Conversation Tasks:**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sys_cs_conversation_task
   query: conversation=<conversation_sys_id>
   fields: ["sys_id","topic_type","state","calling_task","context","sys_created_on","sys_updated_on"]
@@ -302,7 +302,7 @@ servicenow_query_records
 
 **FDIH Invocations (Flow Designer Integration Hub):**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sys_cs_fdih_invocation
   query: calling_cs_conversation_task.conversation.sys_id=<conversation_sys_id>
   fields: ["sys_id","name","response_state","type","execution_mode","error","outputs","sys_created_on","sys_updated_on"]
@@ -317,7 +317,7 @@ servicenow_query_records
 
 **AIA Step Logs:**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sys_cs_aia_step_log
   query: conversation_id=<conversation_sys_id>
   fields: ["sys_id","step_name","bundle_name","state","status","response","additional_args","parent_step","execution_plan_id","sys_created_on","sys_updated_on"]
@@ -339,7 +339,7 @@ servicenow_query_records
 ## System Health Checks (before deep-diving)
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sys_properties
   query: nameSTARTSWITHsn_aia.enable
   fields: ["name","value","description"]

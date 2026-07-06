@@ -12,10 +12,10 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const BATCH_CREATE_TOOL = {
-	name: 'servicenow_batch_create',
+	name: 'sn_batch_create',
 	title: 'Batch create records',
 	description: `What: Create many records in one table via looped Table API calls, dispatched in concurrency-limited waves (default 25 at a time, rate-limited) — not a single bulk request and NOT transactional.
-When to use: To insert several records at once. For a single record use servicenow_create_record.
+When to use: To insert several records at once. For a single record use sn_create_record.
 Preconditions: Write-enabled instance (readOnly: false); valid field names (validated automatically). Default max 50 records per call (configurable via SERVICENOW_MAX_BATCH_SIZE).
 Produces: Per-record success/failure with sys_ids, plus success/failure counts. Not atomic: on failure, already-created rows are NOT rolled back — inspect results[] to see what landed.
 

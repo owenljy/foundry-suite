@@ -10,10 +10,10 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const LIST_TABLES_TOOL = {
-	name: 'servicenow_list_tables',
+	name: 'sn_list_tables',
 	title: 'List tables',
 	description: `What: List tables in the instance, with optional name filtering.
-When to use: To discover which table to use. For a single table's fields use servicenow_get_table_schema.
+When to use: To discover which table to use. For a single table's fields use sn_get_table_schema.
 Preconditions: Read access to the dictionary.
 Produces: An array of tables (name, label, parent table); cached ~15 min in memory, up to 24h on disk.
 

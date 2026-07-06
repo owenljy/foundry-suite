@@ -22,7 +22,7 @@ export const DiffRecordsSchema = z.object({
 export type DiffRecordsInput = z.infer<typeof DiffRecordsSchema>;
 
 /**
- * Output schema for servicenow_diff_records.
+ * Output schema for sn_diff_records.
  *
  * `diffs` maps each changed field name to the two differing values (a from
  * record A, b from record B). Values are open (`z.unknown()`) because a

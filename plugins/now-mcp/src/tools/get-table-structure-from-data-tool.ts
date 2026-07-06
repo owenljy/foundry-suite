@@ -1,7 +1,7 @@
 /**
  * MCP tool for inferring a ServiceNow table's structure from sampled data.
  *
- * A fallback for servicenow_get_table_schema: rather than reading
+ * A fallback for sn_get_table_schema: rather than reading
  * sys_dictionary (which can be thin on legacy/custom tables), this samples real
  * records and infers each field's type, populated ratio, and references.
  */
@@ -17,10 +17,10 @@ import { logger } from '../utils/logger.js';
 import { toolText } from '../utils/tool-response.js';
 
 export const GET_TABLE_STRUCTURE_FROM_DATA_TOOL = {
-	name: 'servicenow_get_table_structure_from_data',
+	name: 'sn_get_table_structure_from_data',
 	title: 'Get table structure from data',
 	description: `What: Infer a table's structure by sampling actual records — per-field inferred type, how often each field is populated, and which fields are references.
-When to use: As a fallback for servicenow_get_table_schema when the sys_dictionary is thin or misleading (legacy/custom tables), or to see which fields are actually used vs. always empty in practice.
+When to use: As a fallback for sn_get_table_schema when the sys_dictionary is thin or misleading (legacy/custom tables), or to see which fields are actually used vs. always empty in practice.
 Preconditions: Read access; the table must exist and contain records (an empty table yields no fields).
 Produces: recordsSampled, alwaysPopulated / neverPopulated field lists, referenceFields (with the referenced table when derivable from the reference link), and a fields array of {name, inferredType, populatedRatio, isReference, sampleValues}.
 

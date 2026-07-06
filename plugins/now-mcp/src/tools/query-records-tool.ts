@@ -54,10 +54,10 @@ function capRenderedRows(records: Record<string, unknown>[]): {
 }
 
 export const QUERY_RECORDS_TOOL = {
-	name: 'servicenow_query_records',
+	name: 'sn_query_records',
 	title: 'Query records',
 	description: `What: List/fetch/read the actual record rows from a ServiceNow table, with filters, field selection, dot-walking, and pagination.
-When to use: To retrieve the rows themselves — show me / fetch / find matching records. For counts, group-by, or avg/sum/min/max use servicenow_aggregate_records instead.
+When to use: To retrieve the rows themselves — show me / fetch / find matching records. For counts, group-by, or avg/sum/min/max use sn_aggregate_records instead.
 Preconditions: Table must exist; the account needs read access to it.
 Produces: An array of the matching records (plus pagination metadata, and recovery hints when empty).
 
@@ -162,7 +162,7 @@ export function createQueryRecordsTool(tableService: TableService) {
 					? [
 							`Note: the result was truncated — showing ${renderedRows.length} of ${fetchedCount} fetched rows ` +
 								`(render cap ${MAX_RETURNED_ROWS} rows / ${MAX_SERIALIZED_BYTES} bytes). ` +
-								`Narrow the query to see the rest: add filters, select fewer fields, or use servicenow_aggregate_records for counts/group-by.`,
+								`Narrow the query to see the rest: add filters, select fewer fields, or use sn_aggregate_records for counts/group-by.`,
 						]
 					: undefined;
 

@@ -175,17 +175,17 @@ export async function registerTools(
 	if (instanceManager.getInstanceCount() > 1) {
 		// Mutates the in-memory default only; no writes to any instance.
 		tools.push(createSwitchDefaultInstanceTool(instanceManager, tableService));
-		logger.info('Multi-instance config — servicenow_switch_default_instance tool enabled');
+		logger.info('Multi-instance config — sn_switch_default_instance tool enabled');
 	} else {
-		logger.info('Single instance — servicenow_switch_default_instance tool disabled');
+		logger.info('Single instance — sn_switch_default_instance tool disabled');
 	}
 
 	// Fluent SDK bridge: only expose when the now-sdk CLI is actually installed.
 	if (isNowSdkAvailable()) {
 		tools.push(createSdkStatusTool(instanceManager));
-		logger.info('now-sdk detected — servicenow_sdk_status tool enabled');
+		logger.info('now-sdk detected — sn_sdk_status tool enabled');
 	} else {
-		logger.info('now-sdk not on PATH — servicenow_sdk_status tool disabled');
+		logger.info('now-sdk not on PATH — sn_sdk_status tool disabled');
 	}
 
 	// Register every tool on the high-level McpServer. The Zod input/output
@@ -237,7 +237,7 @@ export async function registerDegradedTools(
 	// error path all on the supported McpServer API (rather than dropping to the
 	// low-level request handlers, which is brittle across SDK upgrades).
 	server.registerTool(
-		'servicenow_status',
+		'sn_status',
 		{
 			title: 'ServiceNow status',
 			description:

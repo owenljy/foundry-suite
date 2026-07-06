@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
 import { toolText } from '../utils/tool-response.js';
 
 export const UPLOAD_ATTACHMENT_TOOL = {
-	name: 'servicenow_upload_attachment',
+	name: 'sn_upload_attachment',
 	title: 'Upload attachment',
 	description: `What: Attach a file to a ServiceNow record. File content is passed as a base64-encoded string.
 When to use: To add a file to an existing record.

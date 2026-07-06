@@ -107,13 +107,13 @@ export function registerPrompts(server: McpServer, instanceManager: InstanceMana
 			return textPrompt([
 				`Verify the Fluent app in scope "${scope}" deployed correctly:`,
 				'',
-				`1. Confirm artifacts landed: servicenow_query_records on "sys_metadata" with`,
+				`1. Confirm artifacts landed: sn_query_records on "sys_metadata" with`,
 				`   query "sys_scope.scope=${scope}" — group/sanity-check the records you expect`,
-				`   (or use servicenow_aggregate_records grouped by sys_class_name).`,
-				'2. For new/changed tables, re-read the schema with servicenow_get_table_schema.',
-				'3. Exercise behavior: servicenow_execute_background_script to trigger the logic,',
-				'   then servicenow_query_records on "syslog" (level=error, recent) to check for errors.',
-				'4. Confirm the MCP and now-sdk target the same instance with servicenow_sdk_status.',
+				`   (or use sn_aggregate_records grouped by sys_class_name).`,
+				'2. For new/changed tables, re-read the schema with sn_get_table_schema.',
+				'3. Exercise behavior: sn_execute_background_script to trigger the logic,',
+				'   then sn_query_records on "syslog" (level=error, recent) to check for errors.',
+				'4. Confirm the MCP and now-sdk target the same instance with sn_sdk_status.',
 			]);
 		},
 	);
@@ -132,11 +132,11 @@ export function registerPrompts(server: McpServer, instanceManager: InstanceMana
 			return textPrompt([
 				`A now-sdk deploy${scope} failed. Use the instance to explain why:`,
 				'',
-				'1. servicenow_query_records on "syslog" with level=error, ordered by newest,',
+				'1. sn_query_records on "syslog" with level=error, ordered by newest,',
 				'   filtered to around the deploy time — look for the underlying error.',
 				'2. Check "sys_update_xml" / "sys_metadata" for partially-applied records in the scope.',
 				'3. If it is a runtime error in app logic, reproduce it with',
-				'   servicenow_execute_background_script and read the gs.log output.',
+				'   sn_execute_background_script and read the gs.log output.',
 				'4. Summarize the root cause and the specific Fluent source change needed to fix it.',
 			]);
 		},
@@ -163,12 +163,12 @@ export function registerPrompts(server: McpServer, instanceManager: InstanceMana
 			return textPrompt([
 				`Investigate incident ${num}:`,
 				'',
-				`1. servicenow_query_records on "incident" query "number=${num}", displayValue=true,`,
+				`1. sn_query_records on "incident" query "number=${num}", displayValue=true,`,
 				'   dot-walking caller_id.name, assignment_group.name, cmdb_ci.name.',
 				'2. Pull the affected CI and its relationships (cmdb_rel_ci) and recent changes',
 				'   (change_request) touching that CI.',
 				'3. Check for similar recent incidents (same cmdb_ci or short_description) via',
-				'   servicenow_aggregate_records / servicenow_query_records.',
+				'   sn_aggregate_records / sn_query_records.',
 				'4. Summarize likely cause, blast radius, and next action.',
 			]);
 		},
@@ -185,10 +185,10 @@ export function registerPrompts(server: McpServer, instanceManager: InstanceMana
 			textPrompt([
 				'Produce a CMDB health overview:',
 				'',
-				'1. servicenow_aggregate_records on "cmdb_ci" grouped by sys_class_name (count) for inventory.',
+				'1. sn_aggregate_records on "cmdb_ci" grouped by sys_class_name (count) for inventory.',
 				'2. If the CMDB Health engine has run, read "cmdb_health_result" for completeness/',
 				'   correctness/compliance scores.',
-				'3. Compute ad-hoc signals via servicenow_aggregate_records / servicenow_query_records:',
+				'3. Compute ad-hoc signals via sn_aggregate_records / sn_query_records:',
 				'   stale CIs (sys_updated_on old), CIs missing owner/support_group, duplicates by name.',
 				'4. Summarize the biggest data-quality gaps and where to focus.',
 			]),

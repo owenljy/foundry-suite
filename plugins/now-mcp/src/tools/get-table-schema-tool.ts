@@ -29,10 +29,10 @@ function compactField(f: FieldMetadata): Record<string, unknown> {
 }
 
 export const GET_TABLE_SCHEMA_TOOL = {
-	name: 'servicenow_get_table_schema',
+	name: 'sn_get_table_schema',
 	title: 'Get table schema',
 	description: `What: Get a ServiceNow table's fields and their data types — each field's name, type, mandatory/readonly flags (present only when true), max length, and (for reference fields) the table it points to.
-When to use: To discover what fields/columns and data types a table defines, before querying or writing. For the valid values of one choice field use servicenow_get_choice_list. To inspect a referenced table's own fields, call this tool again with that table name.
+When to use: To discover what fields/columns and data types a table defines, before querying or writing. For the valid values of one choice field use sn_get_choice_list. To inspect a referenced table's own fields, call this tool again with that table name.
 Preconditions: Table must exist; the account needs read access.
 Produces: An array of field definitions (cached ~15 min in memory, up to 24h on disk). Set includeExtended=true to include inherited parent-table fields.
 
@@ -75,7 +75,7 @@ export function createGetTableSchemaTool(schemaService: SchemaService) {
 						fieldCount: 0,
 						error: `Table '${validated.tableName}' not found or not readable`,
 						hints: [
-							`No schema found for '${validated.tableName}'. The table may not exist or you may lack read access — verify the name with servicenow_list_tables.`,
+							`No schema found for '${validated.tableName}'. The table may not exist or you may lack read access — verify the name with sn_list_tables.`,
 						],
 					};
 					return {

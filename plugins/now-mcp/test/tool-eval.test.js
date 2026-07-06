@@ -16,13 +16,13 @@ import { TASKS, BEFORE_DESCRIPTIONS } from './eval/fixtures.mjs';
 // AFTER descriptions are read live from the built tool modules so the harness
 // stays in lock-step with shipped code.
 const TOOL_MODULES = {
-  servicenow_query_records: ['../build/tools/query-records-tool.js', 'QUERY_RECORDS_TOOL'],
-  servicenow_aggregate_records: ['../build/tools/aggregate-records-tool.js', 'AGGREGATE_RECORDS_TOOL'],
-  servicenow_get_table_schema: ['../build/tools/get-table-schema-tool.js', 'GET_TABLE_SCHEMA_TOOL'],
-  servicenow_list_tables: ['../build/tools/list-tables-tool.js', 'LIST_TABLES_TOOL'],
-  servicenow_get_choice_list: ['../build/tools/get-choice-list-tool.js', 'GET_CHOICE_LIST_TOOL'],
-  servicenow_create_record: ['../build/tools/create-record-tool.js', 'CREATE_RECORD_TOOL'],
-  servicenow_update_record: ['../build/tools/update-record-tool.js', 'UPDATE_RECORD_TOOL'],
+  sn_query_records: ['../build/tools/query-records-tool.js', 'QUERY_RECORDS_TOOL'],
+  sn_aggregate_records: ['../build/tools/aggregate-records-tool.js', 'AGGREGATE_RECORDS_TOOL'],
+  sn_get_table_schema: ['../build/tools/get-table-schema-tool.js', 'GET_TABLE_SCHEMA_TOOL'],
+  sn_list_tables: ['../build/tools/list-tables-tool.js', 'LIST_TABLES_TOOL'],
+  sn_get_choice_list: ['../build/tools/get-choice-list-tool.js', 'GET_CHOICE_LIST_TOOL'],
+  sn_create_record: ['../build/tools/create-record-tool.js', 'CREATE_RECORD_TOOL'],
+  sn_update_record: ['../build/tools/update-record-tool.js', 'UPDATE_RECORD_TOOL'],
 };
 
 async function loadDescriptor(spec) {
@@ -107,12 +107,12 @@ test('eval scorer is deterministic and decoupled from a single description', asy
   // The scorer only reads {name,title,description}; blanking a description must
   // change its routing, proving the score reflects the text, not a hard-coded map.
   const blanked = candidates.map((c) =>
-    c.name === 'servicenow_aggregate_records' ? { ...c, description: '' } : c
+    c.name === 'sn_aggregate_records' ? { ...c, description: '' } : c
   );
   const routedBlank = routeAsk('How many open incidents per assignment group?', blanked);
   assert.notEqual(
     routedBlank.tool,
-    'servicenow_aggregate_records',
+    'sn_aggregate_records',
     'blanking the aggregate description should stop it from winning the count ask'
   );
 });

@@ -12,10 +12,10 @@ import { logger } from '../utils/logger.js';
 import { toolText } from '../utils/tool-response.js';
 
 export const GET_ATTACHMENT_METADATA_TOOL = {
-	name: 'servicenow_get_attachment_metadata',
+	name: 'sn_get_attachment_metadata',
 	title: 'Get attachment metadata',
 	description: `What: List attachment metadata (file name, content type, size, timestamps) without downloading any file bytes.
-When to use: To discover what files are attached to a record and how big they are, before deciding whether to servicenow_download_attachment.
+When to use: To discover what files are attached to a record and how big they are, before deciding whether to sn_download_attachment.
 Preconditions: Read access. Provide either attachmentSysId (one attachment), or both tableName and recordSysId (all attachments on that record).
 Produces: totalAttachments and an array of metadata objects (sys_id, file_name, content_type, size_bytes, table_name, table_sys_id, sys_created_on, sys_created_by). Never returns file content.
 

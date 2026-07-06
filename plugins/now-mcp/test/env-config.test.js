@@ -20,6 +20,21 @@ function clearFastPathEnv() {
   resetConfig();
 }
 
+// Run `fn` from an empty temp directory so loadConfig()'s cwd fallback (path 3:
+// config/sn-credential.yaml|yml) can't discover a developer's real, git-ignored
+// credential file and turn a "should throw" case into a false failure.
+function inEmptyCwd(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'now-mcp-empty-'));
+  const prev = process.cwd();
+  process.chdir(dir);
+  try {
+    fn();
+  } finally {
+    process.chdir(prev);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 test('fast path: URL + username + password builds one default instance', () => {
   clearFastPathEnv();
   process.env.SERVICENOW_URL = 'https://dev123456.service-now.com';
@@ -95,7 +110,8 @@ test('fast path: blank (whitespace) values are treated as unset', () => {
   process.env.SERVICENOW_URL = '   '; // plugin substitutes empty when blank
   try {
     // URL blank -> fast path doesn't apply; falls through to no-config error.
-    assert.throws(() => loadConfig(), /No ServiceNow configuration found/);
+    // Isolate from cwd so a real config/sn-credential.yaml can't mask the throw.
+    inEmptyCwd(() => assert.throws(() => loadConfig(), /No ServiceNow configuration found/));
   } finally {
     clearFastPathEnv();
   }
@@ -164,16 +180,19 @@ test('precedence: warns when both a config file and fast-path fields are set', (
 test('no config anywhere: error lists cwd and every checked source', () => {
   clearFastPathEnv();
   try {
-    assert.throws(
-      () => loadConfig(),
-      (err) => {
-        assert.match(err.message, /No ServiceNow configuration found/);
-        assert.match(err.message, /Working directory:/);
-        assert.match(err.message, /SERVICENOW_CONFIG_PATH: not set/);
-        assert.match(err.message, /SERVICENOW_URL: not set/);
-        assert.match(err.message, /SERVICENOW_PASSWORD: not set/);
-        return true;
-      },
+    // Isolate from cwd so a real config/sn-credential.yaml can't mask the throw.
+    inEmptyCwd(() =>
+      assert.throws(
+        () => loadConfig(),
+        (err) => {
+          assert.match(err.message, /No ServiceNow configuration found/);
+          assert.match(err.message, /Working directory:/);
+          assert.match(err.message, /SERVICENOW_CONFIG_PATH: not set/);
+          assert.match(err.message, /SERVICENOW_URL: not set/);
+          assert.match(err.message, /SERVICENOW_PASSWORD: not set/);
+          return true;
+        },
+      ),
     );
   } finally {
     clearFastPathEnv();

@@ -1,7 +1,7 @@
 /**
  * Zod schemas for inferring table structure from sampled record data.
  *
- * A data-driven fallback for servicenow_get_table_schema: instead of reading
+ * A data-driven fallback for sn_get_table_schema: instead of reading
  * sys_dictionary (which can be thin/incomplete on legacy or custom tables),
  * these describe the shape produced by sampling actual rows and inferring each
  * field's type and populated ratio.
@@ -28,7 +28,7 @@ export const GetTableStructureFromDataSchema = z.object({
 export type GetTableStructureFromDataInput = z.infer<typeof GetTableStructureFromDataSchema>;
 
 /**
- * Output schema for servicenow_get_table_structure_from_data.
+ * Output schema for sn_get_table_structure_from_data.
  */
 export const GetTableStructureFromDataOutputSchema = z.object({
 	success: z.boolean(),

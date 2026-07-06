@@ -20,7 +20,7 @@ test('registerDegradedTools registers a single status tool that reports the erro
   assert.equal(registered.length, 1);
 
   const [{ name, config, handler }] = registered;
-  assert.equal(name, 'servicenow_status');
+  assert.equal(name, 'sn_status');
   assert.equal(config.annotations.readOnlyHint, true);
   assert.equal(config.annotations.destructiveHint, false);
 

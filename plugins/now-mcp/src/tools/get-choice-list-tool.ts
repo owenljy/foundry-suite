@@ -10,12 +10,12 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const GET_CHOICE_LIST_TOOL = {
-	name: 'servicenow_get_choice_list',
+	name: 'sn_get_choice_list',
 	title: 'Get choice list',
 	description: `What: Get the valid values for a choice (dropdown) field — label and value pairs, in display order.
-When to use: Before setting a choice field, to learn its allowed values. For all of a table's fields use servicenow_get_table_schema.
+When to use: Before setting a choice field, to learn its allowed values. For all of a table's fields use sn_get_table_schema.
 Preconditions: Table and field must exist; read access.
-Produces: An array of {label, value} choices (cached ~15 min in memory, up to 24h on disk). An empty array means the field isn't a choice field or the name is wrong — check servicenow_get_table_schema.
+Produces: An array of {label, value} choices (cached ~15 min in memory, up to 24h on disk). An empty array means the field isn't a choice field or the name is wrong — check sn_get_table_schema.
 
 Examples:
 - tableName="incident", fieldName="priority"
@@ -60,7 +60,7 @@ export function createGetChoiceListTool(schemaService: SchemaService) {
 				// hint lives in the structured body only (no duplicate text block).
 				if (choices.length === 0) {
 					response.hints = [
-						`No choices for '${validated.fieldName}' on '${validated.tableName}'. It may not be a choice field, or the name is wrong — check servicenow_get_table_schema for the exact field name and type.`,
+						`No choices for '${validated.fieldName}' on '${validated.tableName}'. It may not be a choice field, or the name is wrong — check sn_get_table_schema for the exact field name and type.`,
 					];
 				}
 

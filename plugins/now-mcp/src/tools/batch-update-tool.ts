@@ -12,10 +12,10 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const BATCH_UPDATE_TOOL = {
-	name: 'servicenow_batch_update',
+	name: 'sn_batch_update',
 	title: 'Batch update records',
 	description: `What: Update many records in one table via looped Table API calls, dispatched in concurrency-limited waves (default 25 at a time, rate-limited) — not a single bulk request and NOT transactional.
-When to use: To change several records at once. For a single record use servicenow_update_record.
+When to use: To change several records at once. For a single record use sn_update_record.
 Preconditions: Write-enabled instance (readOnly: false); valid sys_ids and field names. Default max 50 updates per call (configurable via SERVICENOW_MAX_BATCH_SIZE).
 Produces: Per-record success/failure with sys_ids, plus counts. Not atomic: on failure, already-applied updates are NOT rolled back — inspect results[].
 

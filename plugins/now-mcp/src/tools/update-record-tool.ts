@@ -13,7 +13,7 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const UPDATE_RECORD_TOOL = {
-	name: 'servicenow_update_record',
+	name: 'sn_update_record',
 	title: 'Update record',
 	description: `What: Modify an existing record (PATCH partial or PUT full) by sys_id.
 When to use: To change field values on a known record. For app metadata, use the Fluent SDK instead.

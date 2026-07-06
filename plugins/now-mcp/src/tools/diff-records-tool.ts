@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const DIFF_RECORDS_TOOL = {
-	name: 'servicenow_diff_records',
+	name: 'sn_diff_records',
 	title: 'Diff records',
 	description: `What: Compare two records on the same table field-by-field and report only the fields that differ.
 When to use: To see what changed between two records (e.g. a record and its clone, or two similar incidents) without fetching both and diffing by hand.

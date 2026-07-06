@@ -10,10 +10,10 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const AGGREGATE_RECORDS_TOOL = {
-	name: 'servicenow_aggregate_records',
+	name: 'sn_aggregate_records',
 	title: 'Aggregate records',
 	description: `What: Compute a count, or avg/sum/min/max, over a table via the Stats API — optionally grouped by one or more fields (group-by supports dot-walking).
-When to use: For "how many", "total count", "per group", "grouped by", or numeric rollups — not when you need the actual rows (use servicenow_query_records for those).
+When to use: For "how many", "total count", "per group", "grouped by", or numeric rollups — not when you need the actual rows (use sn_query_records for those).
 Preconditions: Table must exist; the account needs read access.
 Produces: Aggregate numbers (a single object, or an array of groups when groupBy is set).
 

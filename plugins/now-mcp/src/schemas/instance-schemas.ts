@@ -14,7 +14,7 @@ export const SwitchDefaultInstanceSchema = z.object({
 export type SwitchDefaultInstanceInput = z.infer<typeof SwitchDefaultInstanceSchema>;
 
 /**
- * Output schema for servicenow_switch_default_instance.
+ * Output schema for sn_switch_default_instance.
  */
 export const SwitchDefaultInstanceOutputSchema = z.object({
 	success: z.boolean(),

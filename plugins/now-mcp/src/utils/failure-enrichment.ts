@@ -46,8 +46,8 @@ export function failureHints(text: string, ctx: FailureContext = {}): string[] {
 	switch (classifyFailure(text)) {
 		case 'field_error':
 			return [
-				`A field name appears invalid. Run servicenow_get_table_schema for ${table} to confirm field names`,
-				'For choice fields, servicenow_get_choice_list shows valid values.',
+				`A field name appears invalid. Run sn_get_table_schema for ${table} to confirm field names`,
+				'For choice fields, sn_get_choice_list shows valid values.',
 			];
 		case '403':
 			return [
@@ -63,7 +63,7 @@ export function failureHints(text: string, ctx: FailureContext = {}): string[] {
 			];
 		case '404':
 			return [
-				`Not found. Verify the table name with servicenow_list_tables, and that the sys_id/record exists.`,
+				`Not found. Verify the table name with sn_list_tables, and that the sys_id/record exists.`,
 			];
 		case '400':
 			return [
@@ -85,7 +85,7 @@ export function zeroResultHints(ctx: FailureContext = {}): string[] {
 		);
 	}
 	hints.push(
-		'Confirm field values with servicenow_get_choice_list, or check the table with servicenow_get_table_schema.',
+		'Confirm field values with sn_get_choice_list, or check the table with sn_get_table_schema.',
 	);
 	return hints;
 }

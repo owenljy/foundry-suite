@@ -34,9 +34,9 @@ The async BR that generates the backing flow fires on **insert** of `sn_aia_trig
 
 `sys_security_acl` records named after the use case's `internal_name` are blocked from SDK/Fluent writes. They require `security_admin` elevation and must be created interactively via a Background Script:
 
-> **Running it:** If ServiceNow MCP is authenticated **and** the session has `security_admin` elevation in effect, run the script below automatically via `servicenow_execute_background_script` (param: `script`) and read the `gs.info` output for the created/existing ACL sys_id. If MCP is not authenticated (or elevation is not in effect), run it manually in **Scripts > Background** after elevating (gear menu → Elevate Roles → `security_admin`).
+> **Running it:** If ServiceNow MCP is authenticated **and** the session has `security_admin` elevation in effect, run the script below automatically via `sn_execute_background_script` (param: `script`) and read the `gs.info` output for the created/existing ACL sys_id. If MCP is not authenticated (or elevation is not in effect), run it manually in **Scripts > Background** after elevating (gear menu → Elevate Roles → `security_admin`).
 >
-> **Caveat:** `servicenow_execute_background_script` runs as the integration/admin user and does **not** itself perform the `security_admin` role elevation. If the ACL insert returns a permission error, fall back to the manual elevated path above.
+> **Caveat:** `sn_execute_background_script` runs as the integration/admin user and does **not** itself perform the `security_admin` role elevation. If the ACL insert returns a permission error, fall back to the manual elevated path above.
 
 ```js
 // Scripts > Background — elevate to security_admin first (gear menu → Elevate Roles → security_admin)
@@ -93,7 +93,7 @@ Then set `run_as_user` on the trigger configuration (record 1 above) to `aiUser`
 
 Because failures are silent, confirm all five records before declaring the trigger working:
 
-> **Running it:** If MCP is authenticated, run this via `servicenow_execute_background_script` and parse the printed JSON; otherwise paste it into **Scripts > Background**. Any field reading `MISSING` or `0` is a silent failure.
+> **Running it:** If MCP is authenticated, run this via `sn_execute_background_script` and parse the printed JSON; otherwise paste it into **Scripts > Background**. Any field reading `MISSING` or `0` is a silent failure.
 
 ```js
 // Scripts > Background (agent scope)

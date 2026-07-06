@@ -12,7 +12,7 @@ import { detectWriteOperations, extractTableFieldRefs } from '../utils/script-an
 import { toolResult, toolText } from '../utils/tool-response.js';
 
 export const EXECUTE_BACKGROUND_SCRIPT_TOOL = {
-	name: 'servicenow_execute_background_script',
+	name: 'sn_execute_background_script',
 	title: 'Execute background script',
 	description: `What: Run server-side JavaScript in ServiceNow via a temporary sys_trigger, then return its logged output.
 When to use: For logic the Table/Stats APIs can't express. Prefer query_records / aggregate_records for plain reads.

@@ -54,7 +54,7 @@ Proceed directly to Phase 2.
 
 > **Every query block in this skill** shows the illustrative param shape
 > (`tableName` string, `query` encoded string, `fields` **array** of strings,
-> `limit`) from the `servicenow` MCP's `servicenow_query_records` tool.
+> `limit`) from the `servicenow` MCP's `sn_query_records` tool.
 > Resolve `read_records` per
 > [`../docs/mcp-capability-resolution.md`](../docs/mcp-capability-resolution.md)
 > against whatever MCP is actually connected, and adapt these param names to
@@ -70,7 +70,7 @@ Proceed directly to Phase 2.
 > pseudo-column.
 
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_execution_plan
   query: objectiveLIKE<keyword>^ORDERBYDESCsys_created_on
   fields: ["sys_id","objective","state","state_reason","run_type","execution_time_ms","start_time","end_time"]
@@ -233,7 +233,7 @@ Before deep-diving into a specific run, verify the platform is configured for ob
 
 #### Resolve `read_records`:
 ```
-servicenow_query_records
+sn_query_records
   tableName: sys_properties
   query: nameSTARTSWITHsn_aia.enable
   fields: ["name","value","description"]

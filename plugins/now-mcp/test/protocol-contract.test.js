@@ -18,13 +18,13 @@ const SERVER_ENV = {
 };
 
 const EXPECTED_CORE_TOOLS = [
-  'servicenow_query_records',
-  'servicenow_aggregate_records',
-  'servicenow_create_record',
-  'servicenow_update_record',
-  'servicenow_delete_record',
-  'servicenow_get_table_schema',
-  'servicenow_list_tables',
+  'sn_query_records',
+  'sn_aggregate_records',
+  'sn_create_record',
+  'sn_update_record',
+  'sn_delete_record',
+  'sn_get_table_schema',
+  'sn_list_tables',
 ];
 
 test('server advertises a spec-compliant tool list over MCP stdio', { timeout: 30000 }, async () => {
@@ -75,21 +75,21 @@ test('server advertises a spec-compliant tool list over MCP stdio', { timeout: 3
 
     // Annotations are optional in the spec and the SDK may strip them; only
     // assert their semantics when they are actually exposed.
-    const queryTool = byName.get('servicenow_query_records');
+    const queryTool = byName.get('sn_query_records');
     if (queryTool && queryTool.annotations) {
       assert.equal(
         queryTool.annotations.readOnlyHint,
         true,
-        'servicenow_query_records should be annotated readOnlyHint=true'
+        'sn_query_records should be annotated readOnlyHint=true'
       );
     }
 
-    const deleteTool = byName.get('servicenow_delete_record');
+    const deleteTool = byName.get('sn_delete_record');
     if (deleteTool && deleteTool.annotations) {
       assert.equal(
         deleteTool.annotations.destructiveHint,
         true,
-        'servicenow_delete_record should be annotated destructiveHint=true'
+        'sn_delete_record should be annotated destructiveHint=true'
       );
     }
   } finally {
@@ -163,38 +163,38 @@ test('every advertised tool carries an openWorldHint annotation', { timeout: 300
     }
 
     // The existing safety-hint semantics still hold, now unconditionally.
-    const queryTool = byName.get('servicenow_query_records');
-    assert.ok(queryTool && queryTool.annotations, 'servicenow_query_records must carry annotations');
+    const queryTool = byName.get('sn_query_records');
+    assert.ok(queryTool && queryTool.annotations, 'sn_query_records must carry annotations');
     assert.equal(
       queryTool.annotations.readOnlyHint,
       true,
-      'servicenow_query_records should be annotated readOnlyHint=true'
+      'sn_query_records should be annotated readOnlyHint=true'
     );
 
-    const deleteTool = byName.get('servicenow_delete_record');
-    assert.ok(deleteTool && deleteTool.annotations, 'servicenow_delete_record must carry annotations');
+    const deleteTool = byName.get('sn_delete_record');
+    assert.ok(deleteTool && deleteTool.annotations, 'sn_delete_record must carry annotations');
     assert.equal(
       deleteTool.annotations.destructiveHint,
       true,
-      'servicenow_delete_record should be annotated destructiveHint=true'
+      'sn_delete_record should be annotated destructiveHint=true'
     );
 
     // A live-instance tool reaches an external ServiceNow instance → openWorld.
     assert.equal(
       queryTool.annotations.openWorldHint,
       true,
-      'servicenow_query_records reaches a live instance → openWorldHint=true'
+      'sn_query_records reaches a live instance → openWorldHint=true'
     );
 
     // sdk_status is only advertised when now-sdk is on PATH; when present it is a
     // local, closed-world probe → openWorldHint=false.
-    const sdkStatus = byName.get('servicenow_sdk_status');
+    const sdkStatus = byName.get('sn_sdk_status');
     if (sdkStatus) {
-      assert.ok(sdkStatus.annotations, 'servicenow_sdk_status must carry annotations');
+      assert.ok(sdkStatus.annotations, 'sn_sdk_status must carry annotations');
       assert.equal(
         sdkStatus.annotations.openWorldHint,
         false,
-        'servicenow_sdk_status is a local probe → openWorldHint=false'
+        'sn_sdk_status is a local probe → openWorldHint=false'
       );
     }
   } finally {
@@ -242,7 +242,7 @@ test('malformed tool input returns isError, not a protocol throw', { timeout: 30
     // must surface as a self-correctable tool error, NOT a JSON-RPC protocol
     // throw on the client. (SEP-1303: McpServer validates and wraps it.)
     const result = await client.callTool({
-      name: 'servicenow_get_table_schema',
+      name: 'sn_get_table_schema',
       arguments: { tableName: 12345 },
     });
 

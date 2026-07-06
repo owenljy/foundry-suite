@@ -135,39 +135,39 @@ call, so you can fix it without a crash loop.
 ### Data (read & write runtime records)
 | Tool | What it does |
 |---|---|
-| `servicenow_query_records` | Read any table — encoded-query filters, field selection, **dot-walking**, pagination, display values |
-| `servicenow_aggregate_records` | Counts / group-by / avg / sum / min / max via the **Stats API** (server-side, cheap) |
-| `servicenow_create_record` | Insert a record (with schema field validation + typo hints) |
-| `servicenow_update_record` | Patch/replace a record by sys_id |
-| `servicenow_delete_record` | Delete a record by sys_id (destructive) |
-| `servicenow_batch_create` / `servicenow_batch_update` | Create/update many records in concurrency-limited waves (default 50/call, rate-limited; not transactional) |
-| `servicenow_diff_records` | Compare two records on a table field-by-field; returns only what differs |
+| `sn_query_records` | Read any table — encoded-query filters, field selection, **dot-walking**, pagination, display values |
+| `sn_aggregate_records` | Counts / group-by / avg / sum / min / max via the **Stats API** (server-side, cheap) |
+| `sn_create_record` | Insert a record (with schema field validation + typo hints) |
+| `sn_update_record` | Patch/replace a record by sys_id |
+| `sn_delete_record` | Delete a record by sys_id (destructive) |
+| `sn_batch_create` / `sn_batch_update` | Create/update many records in concurrency-limited waves (default 50/call, rate-limited; not transactional) |
+| `sn_diff_records` | Compare two records on a table field-by-field; returns only what differs |
 
 ### Schema discovery
 | Tool | What it does |
 |---|---|
-| `servicenow_get_table_schema` | Fields, types, references, mandatory/read-only (cached) |
-| `servicenow_get_table_structure_from_data` | Infer structure by **sampling real rows** — fallback when `sys_dictionary` is thin/incomplete |
-| `servicenow_list_tables` | List/filter tables |
-| `servicenow_get_choice_list` | Valid choice values for a field |
-| `servicenow_get_security_info` | Consolidated table security posture — ACLs (table + field), role requirements, data policies, security business rules |
+| `sn_get_table_schema` | Fields, types, references, mandatory/read-only (cached) |
+| `sn_get_table_structure_from_data` | Infer structure by **sampling real rows** — fallback when `sys_dictionary` is thin/incomplete |
+| `sn_list_tables` | List/filter tables |
+| `sn_get_choice_list` | Valid choice values for a field |
+| `sn_get_security_info` | Consolidated table security posture — ACLs (table + field), role requirements, data policies, security business rules |
 
 ### Execution & files
 | Tool | What it does |
 |---|---|
-| `servicenow_execute_background_script` | Run server-side JavaScript (exercise deployed logic; read results from logs) |
-| `servicenow_upload_attachment` / `servicenow_download_attachment` | Attach / fetch files (base64) |
-| `servicenow_get_attachment_metadata` | List attachments on a record (name, type, size) **without** downloading content |
+| `sn_execute_background_script` | Run server-side JavaScript (exercise deployed logic; read results from logs) |
+| `sn_upload_attachment` / `sn_download_attachment` | Attach / fetch files (base64) |
+| `sn_get_attachment_metadata` | List attachments on a record (name, type, size) **without** downloading content |
 
 ### Instances *(only when more than one instance is configured)*
 | Tool | What it does |
 |---|---|
-| `servicenow_switch_default_instance` | Repoint the session default instance (for calls that omit `instance`) + connectivity probe; in-memory only, no YAML write |
+| `sn_switch_default_instance` | Repoint the session default instance (for calls that omit `instance`) + connectivity probe; in-memory only, no YAML write |
 
 ### Fluent SDK bridge *(only when `now-sdk` is installed)*
 | Tool | What it does |
 |---|---|
-| `servicenow_sdk_status` | now-sdk version + auth profiles, and whether the MCP and now-sdk point at the **same instance** |
+| `sn_sdk_status` | now-sdk version + auth profiles, and whether the MCP and now-sdk point at the **same instance** |
 
 ### Beyond tools
 - **Smarter errors** — bad field names are caught before the API call with "did
@@ -187,13 +187,13 @@ other.**
 
 | Job | Use | Why |
 |---|---|---|
-| Read records | `now-sdk query` **or** `servicenow_query_records` | now-sdk query is already aligned to your deploy instance |
+| Read records | `now-sdk query` **or** `sn_query_records` | now-sdk query is already aligned to your deploy instance |
 | Capture instance config → Fluent | **`now-sdk transform`** | Real XML→Fluent with relationships |
 | Author metadata (tables, BRs, ACLs…) | **Fluent `*.now.ts`** + `now-sdk deploy` | Source-controlled; never POST metadata |
-| Counts / group-by | **`servicenow_aggregate_records`** | now-sdk can't aggregate |
-| Write / delete data rows | **`servicenow_create/update/delete_record`** | now-sdk only writes app metadata |
-| Run a server-side script | **`servicenow_execute_background_script`** | now-sdk has no script execution |
-| Confirm both target the same instance | **`servicenow_sdk_status`** | Avoids "deployed to dev, queried prod" |
+| Counts / group-by | **`sn_aggregate_records`** | now-sdk can't aggregate |
+| Write / delete data rows | **`sn_create/update/delete_record`** | now-sdk only writes app metadata |
+| Run a server-side script | **`sn_execute_background_script`** | now-sdk has no script execution |
+| Confirm both target the same instance | **`sn_sdk_status`** | Avoids "deployed to dev, queried prod" |
 
 ### Auto-pairing the instance
 By default (`SERVICENOW_FOLLOW_NOW_SDK` on), the active instance follows whichever
@@ -202,7 +202,7 @@ always target the same instance. List each instance's credentials in the YAML
 once; `now-sdk` is the single switch (reconnect the MCP after switching).
 `now-sdk` keeps its password in the OS keychain, so the YAML still supplies
 credentials. Set `SERVICENOW_FOLLOW_NOW_SDK=false` to pin the YAML `default`, and
-use `servicenow_sdk_status` to check alignment.
+use `sn_sdk_status` to check alignment.
 
 ### Fluent workflow rules (auto-injected)
 When a project is a Fluent app (`now.config.json` at its root), a SessionStart
@@ -224,13 +224,13 @@ post-deploy verify and failure-diagnosis steps on demand.
 ## Typical scenarios
 
 **1. "How many P1 incidents per assignment group this week?"**
-`servicenow_aggregate_records` with `groupBy: ["assignment_group"]` — one call,
+`sn_aggregate_records` with `groupBy: ["assignment_group"]` — one call,
 numbers computed server-side, no row-dumping.
 
 **2. Build a Fluent app and prove it works.**
 Read schema with the MCP → write `*.now.ts` → `now-sdk deploy` (Bash) →
-`servicenow_query_records` to confirm it landed →
-`servicenow_execute_background_script` to trigger logic → read `syslog`.
+`sn_query_records` to confirm it landed →
+`sn_execute_background_script` to trigger logic → read `syslog`.
 
 **3. Reverse-engineer legacy config into source control.**
 `now-sdk transform --table <t>` to capture to Fluent → MCP reads to verify
@@ -238,7 +238,7 @@ behavior matches after redeploy to dev.
 
 **4. Investigate an incident.**
 Query the incident, dot-walk to `caller_id.department.manager`, pull related CIs
-and recent changes — all via `servicenow_query_records`.
+and recent changes — all via `sn_query_records`.
 
 **5. Multi-instance work.**
 Keep dev write-enabled and prod read-only in one YAML. By default the MCP tracks

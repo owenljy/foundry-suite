@@ -349,7 +349,7 @@ on?** Build a **testable version**: a hardcoded `TEST VALUES` block replacing ev
 - **Resolve `run_privileged_script`** (see
   [../docs/mcp-capability-resolution.md](../docs/mcp-capability-resolution.md))
   and run it via that tool, showing the captured output. (On the `servicenow`
-  MCP this is `servicenow_execute_background_script`, not `execute_script` —
+  MCP this is `sn_execute_background_script`, not `execute_script` —
   that tool no longer exists.)
 - **No match found:** present the testable version in a `js` block and ask the
   user to run it at `sys.scripts.do` and share output.
@@ -506,7 +506,7 @@ confirmed non-production, AND user says yes.
 **Instance safety gate — before any write.** "Prefer a non-prod instance" is
 documentation, not enforcement — this step writes real records to whatever
 instance now-sdk/MCP are currently connected to. Before running:
-1. Resolve the connected target: call `servicenow_sdk_status` if the MCP
+1. Resolve the connected target: call `sn_sdk_status` if the MCP
    exposes it (or inspect the active now-sdk profile / `now.config.json`), and
    state the resolved instance name/host to the user.
 2. If resolution fails, or the name/host looks like a customer or production

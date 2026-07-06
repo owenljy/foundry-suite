@@ -8,7 +8,7 @@
  */
 
 export interface ToolCallEntry {
-	/** Tool name, e.g. 'servicenow_query_records'. */
+	/** Tool name, e.g. 'sn_query_records'. */
 	tool: string;
 	/** Wall-clock duration of the handler in milliseconds. */
 	durationMs: number;

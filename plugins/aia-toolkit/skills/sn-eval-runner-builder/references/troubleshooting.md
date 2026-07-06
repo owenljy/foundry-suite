@@ -15,22 +15,22 @@ run these queries in parallel:
 
 ```
 # Usecase exists
-servicenow_query_records  tableName: sn_aia_usecase  query: name=<agent name>  limit: 1
+sn_query_records  tableName: sn_aia_usecase  query: name=<agent name>  limit: 1
 
 # Published version exists
-servicenow_query_records  tableName: sn_aia_version
+sn_query_records  tableName: sn_aia_version
   query: state=published^target_table=sn_aia_usecase^target_id=<usecase_sys_id>  limit: 1
 
 # Dataset records exist
-servicenow_query_records  tableName: aia_artifact_dataset
+sn_query_records  tableName: aia_artifact_dataset
   query: unique_idSTARTSWITH<prefix>  limit: 5
 
 # Auto Chat config exists
-servicenow_query_records  tableName: auto_chat_configuration
+sn_query_records  tableName: auto_chat_configuration
   query: aia_usecase=<usecase_sys_id>  limit: 1
 
 # REST endpoint is correct (not localhost)
-servicenow_query_records  tableName: sys_rest_message  query: name=AutoChatBotToBot  limit: 1
+sn_query_records  tableName: sys_rest_message  query: name=AutoChatBotToBot  limit: 1
 ```
 
 If MCP is not authenticated, run this background script:

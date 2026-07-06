@@ -47,7 +47,7 @@ Resolve the `read_records` capability (see
 [../docs/mcp-capability-resolution.md](../docs/mcp-capability-resolution.md))
 and run these queries **in parallel**. Params below (`tableName` string,
 `query` encoded string, `fields` **array**, `limit`) are the illustrative
-shape from the `servicenow` MCP's `servicenow_query_records` tool — adapt to
+shape from the `servicenow` MCP's `sn_query_records` tool — adapt to
 whichever tool actually resolves.
 
 > **Column names are the DB columns, not the typed-API param names.** The MCP hits
@@ -59,7 +59,7 @@ whichever tool actually resolves.
 
 **2a. Agent record(s):**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_agent
   query: name=<agent name>    (or sys_id=<sys_id>, or omit for all agents)
   fields: ["sys_id","name","description","instructions","role","processing_message","post_processing_message","record_type","sys_scope"]
@@ -68,7 +68,7 @@ servicenow_query_records
 
 **2b. Tool mappings for the agent(s):**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_agent_tool_m2m
   query: agent=<agent_sys_id>    (or omit for all)
   fields: ["sys_id","agent","tool","description","execution_mode","max_auto_executions","pre_message","post_message","display_output","output_transformation_strategy","tool_attributes"]
@@ -77,7 +77,7 @@ servicenow_query_records
 
 **2c. Tool details:**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_tool
   query: sys_idIN<comma-separated tool sys_ids from 2b>
   fields: ["sys_id","name","description","type","script","input_schema","target_document_table"]
@@ -86,7 +86,7 @@ servicenow_query_records
 
 **2d. Version state:**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_version
   query: target_id=<agent_sys_id>^target_table=sn_aia_agent
   fields: ["sys_id","state","target_id","version_name","version_number"]
@@ -95,7 +95,7 @@ servicenow_query_records
 
 **2e. Usecase / workflow check:**
 ```
-servicenow_query_records
+sn_query_records
   tableName: sn_aia_usecase
   query: sys_idIN<usecase_sys_ids if known>
   fields: ["sys_id","name","execution_mode","team","sys_scope"]

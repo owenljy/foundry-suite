@@ -40,7 +40,7 @@ test('read-only write block gets no extra hint (message is already source-aware)
 
 test('field_error hints point at the schema tool', () => {
   const hints = failureHints('Invalid field', { table: 'incident' });
-  assert.match(hints.join(' '), /servicenow_get_table_schema/);
+  assert.match(hints.join(' '), /sn_get_table_schema/);
 });
 
 test('unknown failures produce no hints', () => {

@@ -1,7 +1,7 @@
 # Trace Analyzer — Background Script Fallbacks
 
 On-demand reference for `/sn-aia-trace-analyzer`. These are the **MCP-not-authenticated
-fallback scripts** — every diagnostic step in the skill prefers a `servicenow_query_records`
+fallback scripts** — every diagnostic step in the skill prefers a `sn_query_records`
 MCP call; only reach for the matching script below when MCP isn't available. Paste each in
 **Scripts > Background** (Global scope).
 

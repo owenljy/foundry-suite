@@ -13,7 +13,7 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const CREATE_RECORD_TOOL = {
-	name: 'servicenow_create_record',
+	name: 'sn_create_record',
 	title: 'Create record',
 	description: `What: Insert a new record into a ServiceNow table.
 When to use: To create data records (incident, sys_user, etc.). Do NOT use it to author app metadata (business rules, ACLs, UI policies) — that belongs in the Fluent SDK.

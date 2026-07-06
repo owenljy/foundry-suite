@@ -27,7 +27,7 @@ import {
 import { toolText } from '../utils/tool-response.js';
 
 export const SDK_STATUS_TOOL = {
-	name: 'servicenow_sdk_status',
+	name: 'sn_sdk_status',
 	title: 'now-sdk status',
 	description: `What: Report the ServiceNow Fluent SDK (now-sdk) CLI version and auth profiles, and check that the MCP's configured instance(s) match a now-sdk profile.
 When to use: Before/after Fluent deploys, to confirm now-sdk and the MCP point at the same instance (avoids "deployed to dev, queried prod").

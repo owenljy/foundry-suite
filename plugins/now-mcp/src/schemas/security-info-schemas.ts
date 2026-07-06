@@ -17,7 +17,7 @@ export const GetSecurityInfoSchema = z.object({
 export type GetSecurityInfoInput = z.infer<typeof GetSecurityInfoSchema>;
 
 /**
- * Output schema for servicenow_get_security_info.
+ * Output schema for sn_get_security_info.
  *
  * Each section degrades independently: a missing permission on one query only
  * empties that section and appends a note to `warnings` — it does not fail the

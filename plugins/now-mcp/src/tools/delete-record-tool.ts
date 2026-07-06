@@ -11,7 +11,7 @@ import { logger } from '../utils/logger.js';
 import { toolText } from '../utils/tool-response.js';
 
 export const DELETE_RECORD_TOOL = {
-	name: 'servicenow_delete_record',
+	name: 'sn_delete_record',
 	title: 'Delete record',
 	description: `What: Permanently delete a record by sys_id (destructive).
 When to use: To remove a specific record.

@@ -17,7 +17,7 @@ import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
 export const GET_SECURITY_INFO_TOOL = {
-	name: 'servicenow_get_security_info',
+	name: 'sn_get_security_info',
 	title: 'Get security info',
 	description: `What: A consolidated view of what protects a table — ACLs (access controls), the roles they require, active data policies, and security-related business rules.
 When to use: To understand why access to a table/field is granted or denied, or to audit a table's security posture, without querying each security table separately.

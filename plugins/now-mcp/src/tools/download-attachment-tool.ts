@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
 import { toolText } from '../utils/tool-response.js';
 
 export const DOWNLOAD_ATTACHMENT_TOOL = {
-	name: 'servicenow_download_attachment',
+	name: 'sn_download_attachment',
 	title: 'Download attachment',
 	description: `What: Download a file attachment by its sys_id. Content is returned base64-encoded.
 When to use: To retrieve an attached file's bytes.

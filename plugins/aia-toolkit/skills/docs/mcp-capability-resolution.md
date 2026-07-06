@@ -6,8 +6,8 @@ server connected that exposes equivalent capabilities under different tool and
 parameter names. This doc defines the two capabilities the toolkit needs and
 the protocol for resolving each against whatever is actually connected.
 
-> **Why this exists:** the alternative — hardcoding `servicenow_query_records`
-> and `servicenow_execute_background_script` — only works for one specific MCP
+> **Why this exists:** the alternative — hardcoding `sn_query_records`
+> and `sn_execute_background_script` — only works for one specific MCP
 > server. Requiring a per-vendor mapping table doesn't scale to "whatever
 > happens to be connected." A runtime resolution protocol does.
 
@@ -17,7 +17,7 @@ the protocol for resolving each against whatever is actually connected.
 
 - **Purpose:** read/filter/list records from a ServiceNow table.
 - **Reference param shape** (illustrative — from the `servicenow` MCP's
-  `servicenow_query_records`, not a mandate): table name (string), an encoded
+  `sn_query_records`, not a mandate): table name (string), an encoded
   query string, a `fields` array, a `limit`, and an optional display-value flag
   for reference-field labels.
 - **Used by:** `sn-aia-agent-audit`, `sn-aia-agent-builder`,
