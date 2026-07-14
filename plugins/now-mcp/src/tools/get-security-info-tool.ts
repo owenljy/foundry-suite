@@ -22,7 +22,7 @@ export const GET_SECURITY_INFO_TOOL = {
 	description: `What: A consolidated view of what protects a table — ACLs (access controls), the roles they require, active data policies, and security-related business rules.
 When to use: To understand why access to a table/field is granted or denied, or to audit a table's security posture, without querying each security table separately.
 Preconditions: The table should exist. Read access to the security metadata tables (sys_security_acl, sys_data_policy2, sys_script) — a section you cannot read is returned empty with a note in warnings, the call still succeeds.
-Produces: acls {total, byOperation, tableLevel, fieldLevel, details}, roleRequirements (ACL→role links), dataPolicies, securityBusinessRules, and warnings for any section that could not be read.`,
+Produces (default, includeDetails=false): acls {total, byOperation, tableLevel, fieldLevel}, rolesByOperation (role names required per operation), dataPolicies, securityBusinessRules, warnings. Pass includeDetails=true to also get the raw per-ACL detail array and per-ACL role list — much larger, only ask for it when you need the individual ACL rows.`,
 	inputSchema: GetSecurityInfoSchema,
 	outputSchema: GetSecurityInfoOutputSchema,
 };
@@ -37,6 +37,7 @@ export function createGetSecurityInfoTool(tableService: TableService) {
 				tableName = validated.tableName;
 				const instance = validated.instance;
 				const t = validated.tableName;
+				const includeDetails = validated.includeDetails;
 
 				logger.info(`Getting security info for ${t}`, {
 					instance: instance || 'default',
@@ -51,11 +52,12 @@ export function createGetSecurityInfoTool(tableService: TableService) {
 					query: string,
 					fields: string[],
 					limit: number,
+					displayValue?: boolean | 'all',
 				): Promise<{ records: ServiceNowRecord[]; error?: string }> => {
 					try {
 						const records = await tableService.queryRecords(
 							table,
-							{ query, fields, limit },
+							{ query, fields, limit, excludeReferenceLink: true, displayValue },
 							instance,
 						);
 						return { records };
@@ -90,27 +92,48 @@ export function createGetSecurityInfoTool(tableService: TableService) {
 				]);
 
 				const aclRecords = aclResult.records;
+				const aclById = new Map(aclRecords.map((acl) => [acl.sys_id, acl]));
 
-				// Resolve the role requirements for the first ACLs found.
-				let roleRequirements: ServiceNowRecord[] = [];
+				// Resolve role requirements for the ACLs found. displayValue: 'all' turns
+				// each reference field into {value, display_value} so the role comes back
+				// as its name (e.g. "admin") instead of a bare sys_id — no second lookup.
+				let roleRecords: ServiceNowRecord[] = [];
 				if (aclRecords.length > 0) {
 					const ids = aclRecords
 						.map((acl) => acl.sys_id)
-						.filter((id): id is string => typeof id === 'string' && id.length > 0)
-						.slice(0, 20);
-					if (ids.length > 0) {
-						const roleQuery = ids.map((id) => `sys_security_acl=${id}`).join('^OR');
+						.filter((id): id is string => typeof id === 'string' && id.length > 0);
+					const cappedIds = ids.slice(0, 20);
+					if (ids.length > cappedIds.length) {
+						warnings.push(
+							`Role lookup covers only the first ${cappedIds.length} of ${ids.length} ACLs — role requirements for the rest were not resolved.`,
+						);
+					}
+					if (cappedIds.length > 0) {
+						const roleQuery = cappedIds.map((id) => `sys_security_acl=${id}`).join('^OR');
 						const roleResult = await safeQuery(
 							'sys_security_acl_role',
 							roleQuery,
 							['sys_security_acl', 'sys_user_role'],
 							200,
+							'all',
 						);
-						roleRequirements = roleResult.records;
+						roleRecords = roleResult.records;
 					}
 				}
 
-				// Summarize ACLs: counts per operation, table-level vs field-level.
+				const refValue = (field: unknown): string | undefined =>
+					typeof field === 'object' && field !== null && 'value' in field
+						? String((field as { value: unknown }).value)
+						: typeof field === 'string'
+							? field
+							: undefined;
+				const refDisplay = (field: unknown): string | undefined =>
+					typeof field === 'object' && field !== null && 'display_value' in field
+						? String((field as { display_value: unknown }).display_value)
+						: undefined;
+
+				// Summarize ACLs: counts per operation, table-level vs field-level, and
+				// which role names are required per operation.
 				const byOperation: Record<string, number> = {};
 				let tableLevel = 0;
 				let fieldLevel = 0;
@@ -128,20 +151,40 @@ export function createGetSecurityInfoTool(tableService: TableService) {
 					}
 				}
 
+				const rolesByOperationSets: Record<string, Set<string>> = {};
+				for (const role of roleRecords) {
+					const aclId = refValue(role.sys_security_acl);
+					const roleName = refDisplay(role.sys_user_role) ?? refValue(role.sys_user_role);
+					const acl = aclId ? aclById.get(aclId) : undefined;
+					const operation =
+						acl && typeof acl.operation === 'string' ? acl.operation : (acl?.operation ?? '');
+					const operationKey = String(operation || 'unknown');
+					if (!roleName) continue;
+					(rolesByOperationSets[operationKey] ??= new Set()).add(roleName);
+				}
+				const rolesByOperation: Record<string, string[]> = {};
+				for (const [operation, names] of Object.entries(rolesByOperationSets)) {
+					rolesByOperation[operation] = Array.from(names).sort();
+				}
+
+				const acls: Record<string, unknown> = {
+					total: aclRecords.length,
+					byOperation,
+					tableLevel,
+					fieldLevel,
+				};
 				const response: Record<string, unknown> = {
 					success: true,
 					table: t,
-					acls: {
-						total: aclRecords.length,
-						byOperation,
-						tableLevel,
-						fieldLevel,
-						details: aclRecords,
-					},
-					roleRequirements,
+					acls,
+					rolesByOperation,
 					dataPolicies: dataPolicyResult.records,
 					securityBusinessRules: businessRuleResult.records,
 				};
+				if (includeDetails) {
+					acls.details = aclRecords;
+					response.roleRequirements = roleRecords;
+				}
 				if (warnings.length > 0) {
 					response.warnings = warnings;
 				}
