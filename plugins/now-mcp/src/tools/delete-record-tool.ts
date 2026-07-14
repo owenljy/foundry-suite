@@ -10,7 +10,7 @@ import { elicitConfirmation, toolAborted } from '../utils/elicitation.js';
 import { formatErrorForTool } from '../utils/error-handler.js';
 import { failureHints, renderHints } from '../utils/failure-enrichment.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const DELETE_RECORD_TOOL = {
 	name: 'sn_delete_record',
@@ -64,15 +64,7 @@ export function createDeleteRecordTool(tableService: TableService) {
 					warning: 'Record has been permanently deleted',
 				};
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				return toolResult(response, `deleted ${validated.sysId} from ${validated.tableName}`);
 			} catch (error) {
 				logger.error('Error deleting record', error);
 

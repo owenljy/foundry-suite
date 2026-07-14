@@ -9,7 +9,7 @@ import {
 import type { AttachmentService } from '../services/attachment-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const GET_ATTACHMENT_METADATA_TOOL = {
 	name: 'sn_get_attachment_metadata',
@@ -60,10 +60,7 @@ export function createGetAttachmentMetadataTool(attachmentService: AttachmentSer
 					attachments,
 				};
 
-				return {
-					content: [{ type: 'text' as const, text: toolText(response) }],
-					structuredContent: response,
-				};
+				return toolResult(response, `${attachments.length} attachment(s)`);
 			} catch (error) {
 				logger.error('Error getting attachment metadata', error);
 				return toolError(error, { operation: 'get attachment metadata' });

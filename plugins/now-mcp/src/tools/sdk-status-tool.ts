@@ -24,7 +24,7 @@ import {
 	pickDefaultProfile,
 	resolveFeatures,
 } from '../utils/now-sdk-cli.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const SDK_STATUS_TOOL = {
 	name: 'sn_sdk_status',
@@ -99,10 +99,10 @@ export function createSdkStatusTool(instanceManager: InstanceManager) {
 							: 'All configured MCP instances match a now-sdk auth profile.',
 				};
 
-				return {
-					content: [{ type: 'text' as const, text: toolText(response) }],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`now-sdk ${version}${unaligned.length > 0 ? ` — ${unaligned.length} instance(s) unaligned` : ''}`,
+				);
 			} catch (error) {
 				logger.error('Error getting now-sdk status', error);
 				return {

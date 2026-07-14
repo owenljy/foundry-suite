@@ -15,7 +15,7 @@ import {
 import type { TableService } from '../services/table-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const SWITCH_DEFAULT_INSTANCE_TOOL = {
 	name: 'sn_switch_default_instance',
@@ -83,10 +83,10 @@ export function createSwitchDefaultInstanceTool(
 					...(connectivityDetail !== undefined ? { connectivityDetail } : {}),
 				};
 
-				return {
-					content: [{ type: 'text' as const, text: toolText(response) }],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`switched default instance: ${previousDefault} → ${instance}${connectivityVerified ? '' : ' (connectivity probe failed)'}`,
+				);
 			} catch (error) {
 				logger.error('Error switching default instance', error);
 				return toolError(error, { operation: 'switch default instance' });

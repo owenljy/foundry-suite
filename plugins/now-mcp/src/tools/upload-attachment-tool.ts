@@ -7,7 +7,7 @@ import { UploadAttachmentOutputSchema } from '../schemas/output-schemas.js';
 import type { AttachmentService } from '../services/attachment-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
-import { toolText } from '../utils/tool-response.js';
+import { toolResult } from '../utils/tool-response.js';
 
 export const UPLOAD_ATTACHMENT_TOOL = {
 	name: 'sn_upload_attachment',
@@ -62,15 +62,10 @@ export function createUploadAttachmentTool(attachmentService: AttachmentService)
 					},
 				};
 
-				return {
-					content: [
-						{
-							type: 'text' as const,
-							text: toolText(response),
-						},
-					],
-					structuredContent: response,
-				};
+				return toolResult(
+					response,
+					`uploaded ${attachment.file_name} (${attachment.size_bytes} bytes) to ${validated.tableName}`,
+				);
 			} catch (error) {
 				logger.error('Error uploading attachment', error);
 				return toolError(error, { table: tableName, operation: 'upload attachment' });
