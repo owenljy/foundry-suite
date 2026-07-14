@@ -96,13 +96,13 @@ export function transformError(error: unknown): ServiceNowError {
 	}
 
 	if (error instanceof Error) {
+		// Full stack goes to stderr via logger.error only — it's server-side
+		// debugging detail (local file paths, node/dependency internals) that the
+		// model can't act on. Duplicating it into `details` doubled the size of
+		// every validation-error response (ZodError, the most common failure,
+		// extends Error and landed here) for zero benefit to the caller.
 		logger.error('Unexpected error', error);
-		return new ServiceNowError(
-			error.message,
-			undefined,
-			{ stack: error.stack },
-			'UNEXPECTED_ERROR',
-		);
+		return new ServiceNowError(error.message, undefined, undefined, 'UNEXPECTED_ERROR');
 	}
 
 	logger.error('Unknown error type', { error });
