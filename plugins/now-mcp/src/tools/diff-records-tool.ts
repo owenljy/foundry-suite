@@ -7,6 +7,11 @@ import type { TableService } from '../services/table-service.js';
 import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
+import { truncateValue } from '../utils/value-truncation.js';
+
+/** Same rationale as query-records-tool: a single huge field (a script body, an
+ * XML payload) diffed on both sides can double its size in the response. */
+const MAX_DIFF_VALUE_CHARS = 3000;
 
 export const DIFF_RECORDS_TOOL = {
 	name: 'sn_diff_records',
@@ -56,25 +61,43 @@ export function createDiffRecordsTool(tableService: TableService) {
 				// (object) field values.
 				const keys = new Set<string>([...Object.keys(recordA), ...Object.keys(recordB)]);
 				const diffs: Record<string, { a: unknown; b: unknown }> = {};
+				let valuesTruncated = false;
 				for (const key of keys) {
 					const a = (recordA as Record<string, unknown>)[key];
 					const b = (recordB as Record<string, unknown>)[key];
 					if (JSON.stringify(a) !== JSON.stringify(b)) {
-						diffs[key] = { a, b };
+						const ta = truncateValue(a, MAX_DIFF_VALUE_CHARS);
+						const tb = truncateValue(b, MAX_DIFF_VALUE_CHARS);
+						if (ta.truncated || tb.truncated) valuesTruncated = true;
+						diffs[key] = { a: ta.value, b: tb.value };
 					}
 				}
 
-				const response = {
+				const response: Record<string, unknown> = {
 					success: true,
 					table: validated.tableName,
 					fieldsCompared: keys.size,
 					fieldsChanged: Object.keys(diffs).length,
 					diffs,
 				};
+				if (valuesTruncated) {
+					response.valuesTruncated = true;
+				}
 
 				return toolResult(
 					response,
-					`${Object.keys(diffs).length} field(s) differ of ${keys.size} on ${validated.tableName}`,
+					`${Object.keys(diffs).length} field(s) differ of ${keys.size} on ${validated.tableName}${
+						valuesTruncated ? ' (some values truncated)' : ''
+					}`,
+					valuesTruncated
+						? {
+								extraText: [
+									`Note: one or more diffed values exceeded ${MAX_DIFF_VALUE_CHARS} chars and were truncated ` +
+										`(marked "…[truncated N chars]"). Use the fields[] argument to restrict the comparison, or ` +
+										`fetch the full value directly if you need it in full.`,
+								],
+							}
+						: undefined,
 				);
 			} catch (error) {
 				logger.error('Error diffing records', error);

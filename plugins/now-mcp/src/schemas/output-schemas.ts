@@ -31,12 +31,15 @@ export const QueryRecordsOutputSchema = z.object({
 	// Rows returned in this page (after the render cap).
 	count: z.number(),
 	records: z.array(OpenRecord),
-	// Render guardrail: true when `records` was capped below the fetched result.
+	// Render guardrail: true when `records` was capped below the fetched result,
+	// or when a field value within a returned row was truncated.
 	truncated: z.boolean().optional(),
 	// Rows actually included in `records` after the render cap.
 	returnedRows: z.number().optional(),
 	// Rows fetched in this page before the render cap was applied.
 	fetchedRows: z.number().optional(),
+	// True when one or more field values were shortened (row count untouched).
+	fieldsTruncated: z.boolean().optional(),
 	pagination: z.object({
 		limit: z.number(),
 		offset: z.number(),
@@ -54,6 +57,10 @@ export const AggregateRecordsOutputSchema = z.object({
 	table: z.string(),
 	grouped: z.boolean(),
 	result: z.unknown(),
+	// Render guardrail: true when a grouped `result` array was capped (high-cardinality groupBy).
+	truncated: z.boolean().optional(),
+	returnedGroups: z.number().optional(),
+	fetchedGroups: z.number().optional(),
 });
 
 /** sn_create_record — lean echo: sys_id + the fields the caller set. */
@@ -147,6 +154,8 @@ export const ExecuteScriptOutputSchema = z.object({
 	success: z.boolean(),
 	executionTime: z.number().optional(),
 	output: z.string().nullable().optional(),
+	// True when `output` was shortened to stay under the MCP host's per-call size ceiling.
+	outputTruncated: z.boolean().optional(),
 	error: z.string().nullable().optional(),
 	instance: z.string(),
 	schemaCheck: z.array(OpenRecord).optional(),

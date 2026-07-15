@@ -9,6 +9,7 @@ import { toolError } from '../utils/error-handler.js';
 import { zeroResultHints } from '../utils/failure-enrichment.js';
 import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
+import { truncateRecordFields } from '../utils/value-truncation.js';
 
 /**
  * Render guardrail — independent of the requested `limit` (which the schema caps
@@ -17,10 +18,20 @@ import { toolResult } from '../utils/tool-response.js';
  * serialized JSON size. Whichever cap bites first truncates `records`; the
  * truncation is signaled explicitly (structuredContent.truncated + _meta) and in
  * a human note so the caller can narrow the query instead of silently losing rows.
+ *
+ * The byte cap must stay well under the MCP host's own per-call output ceiling
+ * (Claude Code defaults to ~25k tokens), not just "reasonably small" — dense
+ * content (JSON, stack traces, log lines) tokenizes at ~2-3 chars/token rather
+ * than the ~4 chars/token of English prose, so a naive byte budget sized for
+ * prose can still blow the host limit. 70,000 bytes leaves comfortable margin
+ * even at the worst-case ratio.
  */
 const MAX_RETURNED_ROWS = 1000;
-/** ~1 MB of serialized JSON before we start dropping trailing rows. */
-const MAX_SERIALIZED_BYTES = 1_000_000;
+const MAX_SERIALIZED_BYTES = 70_000;
+/** Per-field cap applied before the row/byte cap — one oversized field (e.g. a
+ * syslog `message`) shouldn't be able to eat the whole byte budget by itself
+ * and starve out every other row. */
+const MAX_FIELD_VALUE_CHARS = 3000;
 
 /**
  * Cap `records` by row count and serialized size. Returns the (possibly
@@ -107,10 +118,19 @@ export function createQueryRecordsTool(tableService: TableService) {
 				const fetchedCount = records.length;
 				const totalMatching = totalCount;
 
+				// Per-field cap first: one oversized value (e.g. a syslog `message`)
+				// shouldn't consume the whole byte budget and starve out other rows.
+				const { records: fieldCappedRecords, truncated: fieldsTruncated } = truncateRecordFields(
+					records,
+					MAX_FIELD_VALUE_CHARS,
+				);
+
 				// Render guardrail: cap the rows that actually reach the caller,
 				// independent of the requested `limit`, so a huge result can't flood the
 				// client context. `renderedRows` is what we serialize.
-				const { rows: renderedRows, truncated } = capRenderedRows(records);
+				const { rows: renderedRows, truncated: rowsTruncated } =
+					capRenderedRows(fieldCappedRecords);
+				const truncated = rowsTruncated || fieldsTruncated;
 
 				// hasMore: prefer the exact answer from the total count (are there rows
 				// beyond this page's offset+size?); fall back to the page-size heuristic
@@ -135,11 +155,14 @@ export function createQueryRecordsTool(tableService: TableService) {
 				};
 
 				// Signal truncation explicitly so the caller can narrow the query
-				// instead of silently losing rows.
+				// instead of silently losing rows/data.
 				if (truncated) {
 					response.truncated = true;
 					response.returnedRows = renderedRows.length;
 					response.fetchedRows = fetchedCount;
+				}
+				if (fieldsTruncated) {
+					response.fieldsTruncated = true;
 				}
 
 				// Enrich an empty result set with recovery hints.
@@ -155,16 +178,27 @@ export function createQueryRecordsTool(tableService: TableService) {
 				// above already capped what goes into `records`.
 				const totalNote = totalMatching !== null ? ` of ${totalMatching} matching` : '';
 				const summary = `${fetchedCount} row(s)${totalNote} on ${validated.tableName}${
-					truncated ? ` (truncated to ${renderedRows.length})` : ''
-				}${records.length === 0 ? ' — see hints' : ''}`;
+					rowsTruncated ? ` (truncated to ${renderedRows.length})` : ''
+				}${fieldsTruncated ? ' (some field values truncated)' : ''}${
+					records.length === 0 ? ' — see hints' : ''
+				}`;
 
-				const extraText = truncated
-					? [
-							`Note: the result was truncated — showing ${renderedRows.length} of ${fetchedCount} fetched rows ` +
-								`(render cap ${MAX_RETURNED_ROWS} rows / ${MAX_SERIALIZED_BYTES} bytes). ` +
-								`Narrow the query to see the rest: add filters, select fewer fields, or use sn_aggregate_records for counts/group-by.`,
-						]
-					: undefined;
+				const extraTextParts: string[] = [];
+				if (rowsTruncated) {
+					extraTextParts.push(
+						`Note: the result was truncated — showing ${renderedRows.length} of ${fetchedCount} fetched rows ` +
+							`(render cap ${MAX_RETURNED_ROWS} rows / ${MAX_SERIALIZED_BYTES} bytes). ` +
+							`Narrow the query to see the rest: add filters, select fewer fields, or use sn_aggregate_records for counts/group-by.`,
+					);
+				}
+				if (fieldsTruncated) {
+					extraTextParts.push(
+						`Note: one or more field values exceeded ${MAX_FIELD_VALUE_CHARS} chars and were truncated ` +
+							`(marked "…[truncated N chars]"). Select fewer/narrower fields, or fetch the full value for a ` +
+							`specific record another way (e.g. a targeted background script) if you need it in full.`,
+					);
+				}
+				const extraText = extraTextParts.length > 0 ? extraTextParts : undefined;
 
 				// _meta carries only genuinely result-level fields (WS-B §4.2); counts and
 				// truncation flags already live in the body, so they are not duplicated here.

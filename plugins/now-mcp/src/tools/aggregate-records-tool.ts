@@ -9,6 +9,37 @@ import { toolError } from '../utils/error-handler.js';
 import { logger } from '../utils/logger.js';
 import { toolResult } from '../utils/tool-response.js';
 
+/**
+ * The Stats API has no sysparm_limit — a high-cardinality groupBy (e.g. by
+ * caller_id) can return an unbounded number of groups. Same render-guardrail
+ * rationale as query-records-tool: cap rows and bytes so a wide group-by can't
+ * flood the response, well under the MCP host's own per-call output ceiling.
+ */
+const MAX_GROUP_ROWS = 2000;
+const MAX_SERIALIZED_BYTES = 70_000;
+
+function capGroups(groups: unknown[]): { rows: unknown[]; truncated: boolean } {
+	let rows = groups.length > MAX_GROUP_ROWS ? groups.slice(0, MAX_GROUP_ROWS) : groups;
+	let truncated = rows.length < groups.length;
+
+	if (Buffer.byteLength(JSON.stringify(rows)) > MAX_SERIALIZED_BYTES) {
+		let lo = 0;
+		let hi = rows.length;
+		while (lo < hi) {
+			const mid = Math.ceil((lo + hi) / 2);
+			if (Buffer.byteLength(JSON.stringify(rows.slice(0, mid))) <= MAX_SERIALIZED_BYTES) {
+				lo = mid;
+			} else {
+				hi = mid - 1;
+			}
+		}
+		rows = rows.slice(0, lo);
+		truncated = true;
+	}
+
+	return { rows, truncated };
+}
+
 export const AGGREGATE_RECORDS_TOOL = {
 	name: 'sn_aggregate_records',
 	title: 'Aggregate records',
@@ -61,12 +92,31 @@ export function createAggregateRecordsTool(tableService: TableService) {
 				const durationMs = Date.now() - startedAt;
 
 				const grouped = Boolean(v.groupBy && v.groupBy.length > 0);
-				const response = {
+
+				// The Stats API has no row limit — a high-cardinality groupBy could
+				// return an unbounded number of groups, so cap what's rendered same as
+				// query-records-tool's render guardrail.
+				let renderedResult = result;
+				let truncated = false;
+				let fetchedGroups: number | undefined;
+				if (grouped && Array.isArray(result)) {
+					fetchedGroups = result.length;
+					const capped = capGroups(result);
+					renderedResult = capped.rows;
+					truncated = capped.truncated;
+				}
+
+				const response: Record<string, unknown> = {
 					success: true,
 					table: v.tableName,
 					grouped,
-					result,
+					result: renderedResult,
 				};
+				if (truncated) {
+					response.truncated = true;
+					response.returnedGroups = (renderedResult as unknown[]).length;
+					response.fetchedGroups = fetchedGroups;
+				}
 
 				// rowCount is only meaningful for a grouped result (one row per group);
 				// a single rollup has no row count, so omit it then.
@@ -74,14 +124,24 @@ export function createAggregateRecordsTool(tableService: TableService) {
 					instance: v.instance || 'default',
 					durationMs,
 				};
-				if (grouped && Array.isArray(result)) {
-					meta.rowCount = result.length;
+				if (grouped && Array.isArray(renderedResult)) {
+					meta.rowCount = renderedResult.length;
 				}
 
+				const returnedGroupCount = Array.isArray(renderedResult) ? renderedResult.length : 0;
 				const summary = grouped
-					? `${Array.isArray(result) ? result.length : 0} group(s) on ${v.tableName}`
+					? `${returnedGroupCount} group(s) on ${v.tableName}${truncated ? ' (truncated)' : ''}`
 					: `aggregate on ${v.tableName}`;
-				return toolResult(response, summary, { meta });
+				return toolResult(response, summary, {
+					meta,
+					extraText: truncated
+						? [
+								`Note: the result was truncated — showing ${returnedGroupCount} of ${fetchedGroups} groups ` +
+									`(render cap ${MAX_GROUP_ROWS} groups / ${MAX_SERIALIZED_BYTES} bytes). ` +
+									`Narrow the query, add a having filter, or group by a lower-cardinality field to see the rest.`,
+							]
+						: undefined,
+				});
 			} catch (error) {
 				logger.error('Error aggregating records', error);
 				return toolError(error, { table: tableName, operation: 'aggregate' });

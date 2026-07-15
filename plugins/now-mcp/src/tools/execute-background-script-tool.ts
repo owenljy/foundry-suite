@@ -11,6 +11,16 @@ import { logger } from '../utils/logger.js';
 import { detectWriteOperations, extractTableFieldRefs } from '../utils/script-analysis.js';
 import { toolResult, toolText } from '../utils/tool-response.js';
 
+/**
+ * Output guardrail. The sys_trigger execution path incidentally caps output at
+ * ~3900 chars (sys_properties.value column width), but the Scripted REST "fast
+ * path" (config.scriptApiPath) returns whatever the instance sends back with NO
+ * cap at all — a script that logs a row per record in a loop can produce output
+ * far beyond the MCP host's own per-call token ceiling. Apply one explicit cap
+ * here so both paths behave the same regardless of which one served the call.
+ */
+const MAX_OUTPUT_CHARS = 8000;
+
 export const EXECUTE_BACKGROUND_SCRIPT_TOOL = {
 	name: 'sn_execute_background_script',
 	title: 'Execute background script',
@@ -87,11 +97,21 @@ export function createExecuteBackgroundScriptTool(
 					validated.instance,
 				);
 
+				let output = result.output ?? null;
+				let outputTruncated = false;
+				if (typeof output === 'string' && output.length > MAX_OUTPUT_CHARS) {
+					outputTruncated = true;
+					output = `${output.slice(0, MAX_OUTPUT_CHARS)}\n…[truncated ${
+						output.length - MAX_OUTPUT_CHARS
+					} chars — narrow the script's logging (fewer/shorter gs.info calls, or aggregate before logging)]`;
+				}
+
 				// Format response for LLM
 				const response = {
 					success: result.success,
 					executionTime: result.executionTime,
-					output: result.output ?? null,
+					output,
+					...(outputTruncated ? { outputTruncated: true } : {}),
 					error: result.error ?? null,
 					instance: validated.instance || 'default',
 					...(schemaCheck ? { schemaCheck } : {}),
