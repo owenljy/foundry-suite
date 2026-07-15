@@ -99,7 +99,8 @@ export function createQueryRecordsTool(tableService: TableService) {
 
 				// Query records
 				const startedAt = Date.now();
-				const { records, totalCount } = await tableService.queryRecordsWithMeta(
+				const { records, totalCount, hasMore: fallbackHasMore, source, fallbackProfile } =
+					await tableService.queryRecordsWithMeta(
 					validated.tableName,
 					{
 						query: validated.query,
@@ -136,9 +137,10 @@ export function createQueryRecordsTool(tableService: TableService) {
 				// beyond this page's offset+size?); fall back to the page-size heuristic
 				// when the instance didn't return X-Total-Count.
 				const hasMore =
-					totalMatching !== null
+					fallbackHasMore ??
+					(totalMatching !== null
 						? validated.offset + fetchedCount < totalMatching
-						: fetchedCount === validated.limit;
+						: fetchedCount === validated.limit);
 
 				// Format response for LLM
 				const response: Record<string, unknown> = {
@@ -203,7 +205,12 @@ export function createQueryRecordsTool(tableService: TableService) {
 				// _meta carries only genuinely result-level fields (WS-B §4.2); counts and
 				// truncation flags already live in the body, so they are not duplicated here.
 				return toolResult(response, summary, {
-					meta: { instance: validated.instance || 'default', durationMs },
+					meta: {
+						instance: validated.instance || 'default',
+						durationMs,
+						...(source ? { source } : {}),
+						...(fallbackProfile ? { fallbackProfile } : {}),
+					},
 					extraText,
 				});
 			} catch (error) {

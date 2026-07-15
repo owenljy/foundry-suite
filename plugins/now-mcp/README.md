@@ -135,7 +135,7 @@ call, so you can fix it without a crash loop.
 ### Data (read & write runtime records)
 | Tool | What it does |
 |---|---|
-| `sn_query_records` | Read any table — encoded-query filters, field selection, **dot-walking**, pagination, display values |
+| `sn_query_records` | Read any table — encoded-query filters, field selection, **dot-walking**, pagination, display values; on MCP auth/transport failure, automatically tries an aligned `now-sdk query` profile |
 | `sn_aggregate_records` | Counts / group-by / avg / sum / min / max via the **Stats API** (server-side, cheap) |
 | `sn_create_record` | Insert a record (with schema field validation + typo hints) |
 | `sn_update_record` | Patch/replace a record by sys_id |
@@ -194,6 +194,18 @@ other.**
 | Write / delete data rows | **`sn_create/update/delete_record`** | now-sdk only writes app metadata |
 | Run a server-side script | **`sn_execute_background_script`** | now-sdk has no script execution |
 | Confirm both target the same instance | **`sn_sdk_status`** | Avoids "deployed to dev, queried prod" |
+
+### Read-path recovery with `now-sdk query`
+
+`now-sdk query` authenticates through the CLI's own profile, not now-mcp's HTTP
+client credentials. Treat it as the first read-only diagnostic path when
+now-mcp authentication, transport, server, or circuit-breaker
+failures make repeated MCP calls unproductive. `sn_query_records` does this
+automatically when now-sdk >=4.8 is installed **and** an auth profile matches
+the selected MCP instance host. Successful fallback responses report
+`meta.source: "now-sdk-query"` and `meta.fallbackProfile`; the host check fails
+closed so recovery cannot silently query another environment. Writes never
+fall back to the CLI.
 
 ### Auto-pairing the instance
 By default (`SERVICENOW_FOLLOW_NOW_SDK` on), the active instance follows whichever

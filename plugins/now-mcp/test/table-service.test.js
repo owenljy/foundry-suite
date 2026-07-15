@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TableService } from '../build/services/table-service.js';
+import { NetworkError, ServiceNowError } from '../build/types/errors.js';
+import { shouldFallbackToNowSdkQuery, TableService } from '../build/services/table-service.js';
 
 /**
  * A stub ServiceNow client that records every call (endpoint + params/body)
@@ -51,9 +52,11 @@ function makeStubClient(responses = {}) {
  * by default so write-access validation passes.
  */
 function makeManager(client, config = {}) {
+	const resolvedConfig = { name: 'dev', url: 'https://dev.service-now.com', readOnly: false, ...config };
   return {
     getClient: () => client,
-    getConfig: () => ({ name: 'dev', readOnly: false, ...config }),
+		resolveInstance: () => ({ name: resolvedConfig.name, config: resolvedConfig, client }),
+		getConfig: () => resolvedConfig,
     getConfigSource: () => ({ kind: 'env' }),
   };
 }
@@ -104,6 +107,15 @@ test('queryRecordsWithMeta reports null totalCount when header is absent', async
   const svc = new TableService(makeManager(client));
   const out = await svc.queryRecordsWithMeta('incident', {});
   assert.equal(out.totalCount, null);
+});
+
+test('now-sdk query fallback is limited to independent-path failures', () => {
+	assert.equal(shouldFallbackToNowSdkQuery(new NetworkError('socket reset')), true);
+	assert.equal(shouldFallbackToNowSdkQuery(new ServiceNowError('Unauthorized', 401)), true);
+	assert.equal(shouldFallbackToNowSdkQuery(new ServiceNowError('Server error', 503)), true);
+	assert.equal(shouldFallbackToNowSdkQuery(new ServiceNowError('Forbidden', 403)), false);
+	assert.equal(shouldFallbackToNowSdkQuery(new ServiceNowError('Rate limited', 429)), false);
+	assert.equal(shouldFallbackToNowSdkQuery(new ServiceNowError('Bad query', 400)), false);
 });
 
 test('queryRecords blocks XSS-style queries via sanitizeQuery', async () => {

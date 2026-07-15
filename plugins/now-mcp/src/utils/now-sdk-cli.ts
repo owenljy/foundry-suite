@@ -10,6 +10,30 @@
 
 import { spawnSync } from 'node:child_process';
 
+export interface NowSdkQueryOptions {
+	query?: string;
+	limit?: number;
+	offset?: number;
+	fields?: string[];
+	displayValue?: boolean | 'all';
+	excludeReferenceLink?: boolean;
+}
+
+export interface NowSdkQuerySuccess {
+	ok: true;
+	records: Record<string, unknown>[];
+	hasMore: boolean;
+	nextOffset: number | null;
+	profile: string;
+}
+
+export interface NowSdkQueryFailure {
+	ok: false;
+	reason: string;
+}
+
+export type NowSdkQueryResult = NowSdkQuerySuccess | NowSdkQueryFailure;
+
 export interface AuthProfile {
 	alias: string;
 	host: string;
@@ -203,6 +227,101 @@ function runNowSdk(
 			stderr: error instanceof Error ? error.message : String(error),
 		};
 	}
+}
+
+/**
+ * Parse the machine-readable envelope emitted by `now-sdk query -o json`.
+ * Kept pure both for contract tests and so malformed CLI output fails closed.
+ */
+export function parseNowSdkQueryOutput(output: string): Omit<NowSdkQuerySuccess, 'profile'> | null {
+	try {
+		const parsed = JSON.parse(output.trim()) as {
+			ok?: unknown;
+			records?: unknown;
+			hasMore?: unknown;
+			nextOffset?: unknown;
+		};
+		if (parsed.ok !== true || !Array.isArray(parsed.records)) return null;
+		if (!parsed.records.every((row) => row !== null && typeof row === 'object' && !Array.isArray(row))) {
+			return null;
+		}
+		return {
+			ok: true,
+			records: parsed.records as Record<string, unknown>[],
+			hasMore: parsed.hasMore === true,
+			nextOffset:
+				typeof parsed.nextOffset === 'number' && Number.isFinite(parsed.nextOffset)
+					? parsed.nextOffset
+					: null,
+		};
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Execute the CLI's independent, read-only query path with an explicit auth
+ * alias. Arguments are passed directly to spawnSync (never through a shell).
+ */
+export function runNowSdkQuery(
+	profile: string,
+	table: string,
+	options: NowSdkQueryOptions = {},
+): NowSdkQueryResult {
+	const requestTimeoutMs = 30_000;
+	const args = [
+		'query',
+		table,
+		'--query',
+		options.query || 'sys_idISNOTEMPTY',
+		'--limit',
+		String(options.limit ?? 100),
+		'--offset',
+		String(options.offset ?? 0),
+		'--auth',
+		profile,
+		'--timeout',
+		String(requestTimeoutMs),
+		'--output',
+		'json',
+	];
+	if (options.fields?.length) args.push('--fields', options.fields.join(','));
+	if (options.displayValue !== undefined) {
+		args.push('--display-value', String(options.displayValue));
+	}
+	if (options.excludeReferenceLink === false) args.push('--no-exclude-reference-link');
+
+	// Give the process a small shutdown margin beyond now-sdk's own request bound.
+	const result = runNowSdk(args, requestTimeoutMs + 5_000);
+	if (!result.ok) return { ok: false, reason: 'now-sdk query exited unsuccessfully' };
+	const parsed = parseNowSdkQueryOutput(result.stdout);
+	if (!parsed) return { ok: false, reason: 'now-sdk query returned an invalid JSON envelope' };
+	return { ...parsed, profile };
+}
+
+/**
+ * Run a query only when a now-sdk credential is proven to target the same host
+ * as the selected MCP instance. This prevents a recovery path from silently
+ * reading a different environment.
+ */
+export function queryNowSdkWithAlignedProfile(
+	instanceUrl: string,
+	table: string,
+	options: NowSdkQueryOptions = {},
+): NowSdkQueryResult {
+	const version = parseSemVer(getNowSdkVersion());
+	if (!resolveFeatures(version).query) {
+		return { ok: false, reason: 'now-sdk query is unavailable (requires now-sdk >=4.8.0)' };
+	}
+	if (!isAuthListFormatVerified(version)) {
+		return { ok: false, reason: 'installed now-sdk auth-list format is not verified' };
+	}
+	const target = normalizeHost(instanceUrl);
+	const profile = listNowSdkProfiles().find((candidate) => normalizeHost(candidate.host) === target);
+	if (!profile) {
+		return { ok: false, reason: 'no now-sdk auth profile matches the selected MCP instance' };
+	}
+	return runNowSdkQuery(profile.alias, table, options);
 }
 
 // Probe `now-sdk --version` once per process — presence and version don't change

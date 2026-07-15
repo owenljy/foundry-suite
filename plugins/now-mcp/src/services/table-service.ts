@@ -4,6 +4,7 @@
 
 import type { InstanceManager } from '../client/instance-manager.js';
 import { API_ENDPOINTS } from '../config/constants.js';
+import { CircuitOpenError, NetworkError, ServiceNowError } from '../types/errors.js';
 import type {
 	AggregateOptions,
 	QueryOptions,
@@ -13,6 +14,7 @@ import type {
 	TableAPIResponse,
 } from '../types/servicenow.js';
 import { logger } from '../utils/logger.js';
+import { queryNowSdkWithAlignedProfile } from '../utils/now-sdk-cli.js';
 import {
 	sanitizeQuery,
 	validatePagination,
@@ -26,6 +28,25 @@ function parseTotalCount(raw: string | undefined): number | null {
 	if (raw === undefined) return null;
 	const n = Number.parseInt(raw, 10);
 	return Number.isFinite(n) ? n : null;
+}
+
+/** Failures where retrying the same MCP transport/auth path is unlikely to help. */
+export function shouldFallbackToNowSdkQuery(error: unknown): boolean {
+	if (error instanceof CircuitOpenError || error instanceof NetworkError) return true;
+	if (!(error instanceof ServiceNowError)) return false;
+	return (
+		error.statusCode === 401 ||
+		(error.statusCode !== undefined && error.statusCode >= 500)
+	);
+}
+
+export interface QueryRecordsResult<T extends ServiceNowRecord = ServiceNowRecord> {
+	records: T[];
+	totalCount: number | null;
+	/** Exact page signal supplied by now-sdk; absent on the native Table API path. */
+	hasMore?: boolean;
+	source?: 'now-mcp' | 'now-sdk-query';
+	fallbackProfile?: string;
 }
 
 export class TableService {
@@ -58,11 +79,12 @@ export class TableService {
 		tableName: string,
 		options: QueryOptions = {},
 		instance?: string,
-	): Promise<{ records: T[]; totalCount: number | null }> {
+	): Promise<QueryRecordsResult<T>> {
 		validateTableName(tableName);
 		validatePagination(options.limit, options.offset);
 
-		const client = this.instanceManager.getClient(instance);
+		const resolved = this.instanceManager.resolveInstance(instance);
+		const client = resolved.client;
 		const endpoint = API_ENDPOINTS.TABLE_RECORD(tableName);
 
 		// Build query parameters
@@ -94,15 +116,54 @@ export class TableService {
 
 		logger.debug(`Querying table: ${tableName}`, { params, instance: instance || 'default' });
 
-		const { data, headers } = await client.getWithHeaders<TableAPIResponse<T>>(endpoint, params);
-		const totalCount = parseTotalCount(headers['x-total-count']);
+		try {
+			const { data, headers } = await client.getWithHeaders<TableAPIResponse<T>>(endpoint, params);
+			const totalCount = parseTotalCount(headers['x-total-count']);
 
-		logger.info(`Retrieved ${data.result.length} records from ${tableName}`, {
-			instance: instance || 'default',
-			totalCount,
-		});
+			logger.info(`Retrieved ${data.result.length} records from ${tableName}`, {
+				instance: resolved.name,
+				totalCount,
+			});
 
-		return { records: data.result, totalCount };
+			return { records: data.result, totalCount, source: 'now-mcp' };
+		} catch (error) {
+			if (!shouldFallbackToNowSdkQuery(error)) throw error;
+
+			logger.warn('Native record query failed; trying aligned now-sdk query fallback', {
+				instance: resolved.name,
+				table: tableName,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			const fallback = queryNowSdkWithAlignedProfile(resolved.config.url, tableName, {
+				query: options.query ? sanitizeQuery(options.query) : undefined,
+				limit: options.limit,
+				offset: options.offset,
+				fields: options.fields,
+				displayValue: options.displayValue,
+				excludeReferenceLink: options.excludeReferenceLink,
+			});
+			if (!fallback.ok) {
+				logger.warn('now-sdk query fallback was unavailable', {
+					instance: resolved.name,
+					table: tableName,
+					reason: fallback.reason,
+				});
+				throw error;
+			}
+
+			logger.info(`Recovered query of ${tableName} through now-sdk`, {
+				instance: resolved.name,
+				profile: fallback.profile,
+				count: fallback.records.length,
+			});
+			return {
+				records: fallback.records as T[],
+				totalCount: null,
+				hasMore: fallback.hasMore,
+				source: 'now-sdk-query',
+				fallbackProfile: fallback.profile,
+			};
+		}
 	}
 
 	/**

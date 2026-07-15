@@ -11,6 +11,7 @@ import {
   resolveFeatures,
   isAuthListFormatVerified,
   NOW_SDK_FEATURE_CONSTRAINTS,
+	parseNowSdkQueryOutput,
 } from '../build/utils/now-sdk-cli.js';
 
 // VERIFIED real 4.8.0 `now-sdk auth --list -o json` output: the `-o json` flag
@@ -52,6 +53,21 @@ test('parseAuthList extracts alias/host/type/username/isDefault from real 4.8.0 
 
   // Exactly one default across the list.
   assert.equal(profiles.filter((p) => p.isDefault).length, 1);
+});
+
+test('parseNowSdkQueryOutput accepts the documented JSON query envelope', () => {
+	assert.deepEqual(
+		parseNowSdkQueryOutput(
+			'{"ok":true,"hasMore":true,"nextOffset":1,"records":[{"sys_id":"abc"}]}',
+		),
+		{ ok: true, records: [{ sys_id: 'abc' }], hasMore: true, nextOffset: 1 },
+	);
+});
+
+test('parseNowSdkQueryOutput fails closed on errors and malformed records', () => {
+	assert.equal(parseNowSdkQueryOutput('{"ok":false,"records":[]}'), null);
+	assert.equal(parseNowSdkQueryOutput('{"ok":true,"records":[null]}'), null);
+	assert.equal(parseNowSdkQueryOutput('not-json'), null);
 });
 
 test('parseAuthList skips the preamble and tolerates missing username/oauth profiles', () => {

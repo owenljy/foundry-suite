@@ -58,6 +58,7 @@ export function failureHints(text: string, ctx: FailureContext = {}): string[] {
 		case 'circuit_open':
 			return [
 				'This is a local instance-wide anti-lockout pause; no ServiceNow request was sent for this call. Run sn_connection_status for the reason and retryAfterMs.',
+				'For read-only record verification, switch immediately to now-sdk query; it uses the CLI credential path independently of now-mcp.',
 				'Fix the underlying credentials/connectivity first. Then use sn_reset_connection. Basic-auth credential changes require restarting/reconnecting now-mcp because browser login does not update MCP credentials.',
 			];
 		case 'field_error':
@@ -80,6 +81,7 @@ export function failureHints(text: string, ctx: FailureContext = {}): string[] {
 		case '401':
 			return [
 				'Authentication failed at the API layer. Browser/UI login is a separate session and does not update now-mcp credentials.',
+				'For read-only record verification, use now-sdk query while repairing now-mcp; it authenticates through the CLI own profile.',
 				'Basic auth: fix the configured env/YAML credentials, then restart/reconnect now-mcp. OAuth: check client/grant/user settings; the client automatically discards a rejected cached token and retries once.',
 				'After the cause is fixed, use sn_reset_connection (or wait for the reported cooldown) before retrying.',
 			];
