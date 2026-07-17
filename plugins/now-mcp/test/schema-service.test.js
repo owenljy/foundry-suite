@@ -194,3 +194,64 @@ test('disk cache identity includes URL when the same profile name is repointed',
 
   assert.equal(second.state.dictionaryCalls, 1, 'repointed profile must not consume old disk cache');
 });
+
+function makeWsAccessClient(wsAccessValue) {
+  const state = { calls: 0 };
+  return {
+    state,
+    async get(endpoint, params) {
+      state.calls++;
+      assert.equal(endpoint, '/api/now/table/sys_db_object');
+      assert.equal(params.sysparm_fields, 'name,ws_access');
+      if (wsAccessValue === undefined) return { result: [] };
+      return { result: [{ name: 'sn_grc_indicator', ws_access: wsAccessValue }] };
+    },
+  };
+}
+
+test('checkWebServiceAccess reports wsAccess:false when ws_access is "false"', async () => {
+  const client = makeWsAccessClient('false');
+  const svc = new SchemaService(makeManager(client));
+
+  const result = await svc.checkWebServiceAccess('sn_grc_indicator', 'wsdisabled');
+  assert.deepEqual(result, { exists: true, wsAccess: false });
+});
+
+test('checkWebServiceAccess reports wsAccess:true when ws_access is "true"', async () => {
+  const client = makeWsAccessClient('true');
+  const svc = new SchemaService(makeManager(client));
+
+  const result = await svc.checkWebServiceAccess('incident', 'wsenabled');
+  assert.deepEqual(result, { exists: true, wsAccess: true });
+});
+
+test('checkWebServiceAccess reports exists:false for a table with no sys_db_object row', async () => {
+  const client = makeWsAccessClient(undefined);
+  const svc = new SchemaService(makeManager(client));
+
+  const result = await svc.checkWebServiceAccess('nope_not_a_table', 'wsnotfound');
+  assert.deepEqual(result, { exists: false, wsAccess: false });
+});
+
+test('checkWebServiceAccess returns null (not a throw) when the probe itself fails', async () => {
+  const client = {
+    async get() {
+      throw new Error('network error');
+    },
+  };
+  const svc = new SchemaService(makeManager(client));
+
+  const result = await svc.checkWebServiceAccess('incident', 'wsfailure');
+  assert.equal(result, null);
+});
+
+test('checkWebServiceAccess serves the second call from cache (client hit once)', async () => {
+  const client = makeWsAccessClient('false');
+  const svc = new SchemaService(makeManager(client));
+
+  await svc.checkWebServiceAccess('sn_grc_indicator', 'wscache');
+  assert.equal(client.state.calls, 1);
+
+  await svc.checkWebServiceAccess('sn_grc_indicator', 'wscache');
+  assert.equal(client.state.calls, 1, 'second call should be served from cache');
+});

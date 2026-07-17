@@ -4,7 +4,9 @@
 
 import { QueryRecordsOutputSchema } from '../schemas/output-schemas.js';
 import { QueryRecordsSchema } from '../schemas/table-schemas.js';
+import type { SchemaService } from '../services/schema-service.js';
 import type { TableService } from '../services/table-service.js';
+import { ServiceNowError } from '../types/errors.js';
 import { toolError } from '../utils/error-handler.js';
 import { zeroResultHints } from '../utils/failure-enrichment.js';
 import { logger } from '../utils/logger.js';
@@ -74,6 +76,8 @@ Produces: An array of the matching records (plus pagination metadata, and recove
 
 Encoded query goes in the query param (operators: = != ^ ^OR > < >= <= LIKE STARTSWITH ENDSWITH IN ISEMPTY ISNOTEMPTY; dot-walk reference fields, e.g. caller_id.department.name=Network).
 
+A 403 is auto-diagnosed against the table's web-service access flag, so the returned hint distinguishes "this table blocks all REST access regardless of role" from "your account lacks the required role/ACL" — trust that hint over re-investigating roles manually.
+
 Examples:
 - tableName="incident", query="priority=1^state=2", fields=["number","short_description"]
 - Pagination: limit=50, offset=100 (response.pagination.hasMore / totalMatching guide the next page)`,
@@ -81,15 +85,17 @@ Examples:
 	outputSchema: QueryRecordsOutputSchema,
 };
 
-export function createQueryRecordsTool(tableService: TableService) {
+export function createQueryRecordsTool(tableService: TableService, schemaService: SchemaService) {
 	return {
 		...QUERY_RECORDS_TOOL,
 		handler: async (params: unknown) => {
 			let tableName: string | undefined;
+			let instance: string | undefined;
 			try {
 				// Validate input
 				const validated = QueryRecordsSchema.parse(params);
 				tableName = validated.tableName;
+				instance = validated.instance;
 
 				logger.info(`Querying ${validated.tableName}`, {
 					query: validated.query,
@@ -220,8 +226,37 @@ export function createQueryRecordsTool(tableService: TableService) {
 				});
 			} catch (error) {
 				logger.error('Error querying records', error);
-				return toolError(error, { table: tableName, query: undefined, operation: 'query' });
+				const wsAccess = await probeWebServiceAccess(error, tableName, instance, schemaService);
+				return toolError(error, { table: tableName, query: undefined, operation: 'query', wsAccess });
 			}
 		},
 	};
+}
+
+/**
+ * On a genuine server-side 403 (not the client-side SERVICENOW_BLOCKED_TABLES/
+ * ALLOWED_TABLES check, which already carries its own precise hint), probe
+ * whether the table's web-service access is disabled — the actual cause of a
+ * whole class of 403s that have nothing to do with roles/ACLs. Best-effort:
+ * any failure of the probe itself falls back to 'unknown' so it never masks
+ * the original error.
+ */
+async function probeWebServiceAccess(
+	error: unknown,
+	tableName: string | undefined,
+	instance: string | undefined,
+	schemaService: SchemaService,
+): Promise<'disabled' | 'enabled' | 'unknown'> {
+	if (!tableName) return 'unknown';
+	if (!(error instanceof ServiceNowError) || error.statusCode !== 403) return 'unknown';
+	const details = error.servicenowError as { operationType?: string } | undefined;
+	if (details?.operationType === 'table-access') return 'unknown';
+
+	try {
+		const result = await schemaService.checkWebServiceAccess(tableName, instance);
+		if (!result || !result.exists) return 'unknown';
+		return result.wsAccess ? 'enabled' : 'disabled';
+	} catch {
+		return 'unknown';
+	}
 }

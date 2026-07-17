@@ -14,6 +14,17 @@ export interface FailureContext {
 	query?: string;
 	/** ServiceNow roles required by this tool, surfaced in 403 hints. */
 	requiredRoles?: string[];
+	/** HTTP status code from the failed response, when known. Preferred over
+	 * text matching in classifyFailure — ServiceNow's own error.message text
+	 * (e.g. "User Not Authorized") does not reliably contain the status code
+	 * or recognizable keywords. */
+	statusCode?: number;
+	/** Whether the target table's "Allow access to this table via web
+	 * services" (sys_db_object.ws_access) flag was found to be off — a
+	 * table-level block that rejects all REST Table API access before any
+	 * role/ACL evaluation happens, independent of the caller's roles.
+	 * 'unknown' when the probe wasn't run or couldn't determine an answer. */
+	wsAccess?: 'disabled' | 'enabled' | 'unknown';
 }
 
 export type FailureType =
@@ -26,7 +37,7 @@ export type FailureType =
 	| 'field_error'
 	| 'unknown';
 
-export function classifyFailure(text: string): FailureType {
+export function classifyFailure(text: string, statusCode?: number): FailureType {
 	const t = text.toLowerCase();
 	if (t.includes('circuit_open') || t.includes('circuit open')) return 'circuit_open';
 	if (
@@ -37,12 +48,21 @@ export function classifyFailure(text: string): FailureType {
 	) {
 		return 'field_error';
 	}
-	if (t.includes('401') || t.includes('authentication') || t.includes('unauthorized')) return '401';
 	// A client-side read-only write block (thrown before any HTTP call). Its
 	// message already carries source-aware remediation, so it needs no extra hint —
 	// classify it distinctly from a genuine server ACL 403 to avoid appending
 	// stale, contradictory YAML advice.
 	if (t.includes('read-only') || t.includes('not permitted on read-only')) return 'readonly';
+
+	// Prefer the structured HTTP status when available — ServiceNow's own
+	// error.message text (e.g. "User Not Authorized") doesn't always contain a
+	// recognizable keyword or the numeric code itself.
+	if (statusCode === 401) return '401';
+	if (statusCode === 403) return '403';
+	if (statusCode === 404) return '404';
+	if (statusCode === 400) return '400';
+
+	if (t.includes('401') || t.includes('authentication') || t.includes('unauthorized')) return '401';
 	if (t.includes('403') || t.includes('access denied') || t.includes('forbidden')) return '403';
 	if (t.includes('404') || t.includes('not found') || t.includes('does not exist')) return '404';
 	if (t.includes('400') || t.includes('bad request')) return '400';
@@ -54,7 +74,7 @@ export function classifyFailure(text: string): FailureType {
  */
 export function failureHints(text: string, ctx: FailureContext = {}): string[] {
 	const table = ctx.table ? `'${ctx.table}'` : 'the table';
-	switch (classifyFailure(text)) {
+	switch (classifyFailure(text, ctx.statusCode)) {
 		case 'circuit_open':
 			return [
 				'This is a local instance-wide anti-lockout pause; no ServiceNow request was sent for this call. Run sn_connection_status for the reason and retryAfterMs.',
@@ -67,11 +87,23 @@ export function failureHints(text: string, ctx: FailureContext = {}): string[] {
 				'For choice fields, sn_get_choice_list shows valid values.',
 			];
 		case '403': {
+			if (ctx.wsAccess === 'disabled') {
+				return [
+					`${table} has "Allow access to this table via web services" (sys_db_object.ws_access) turned off. This blocks ALL REST/Table API access to the table before any role or ACL check runs — it is not a role problem, and admin does not override it.`,
+					'This is often an intentional restriction on sensitive tables (e.g. GRC). Confirm with a table owner/admin before changing it — it is a security-posture setting, not a bug to route around silently.',
+					'To read this data without changing the setting: sn_execute_background_script (GlideRecordSecure is not gated by ws_access) or now-sdk query (authenticates via a UI session, which ServiceNow does not treat as a web-service call).',
+					'If it does need to change, that is a table-definition change and belongs in the Fluent SDK (now-sdk), not a direct sys_db_object write.',
+				];
+			}
 			const roleNote = ctx.requiredRoles?.length
 				? ` This tool requires the ${ctx.requiredRoles.join(' or ')} role.`
 				: '';
+			const aclNote =
+				ctx.wsAccess === 'enabled'
+					? ' Web-service access to the table is enabled, so this is a role/ACL/field restriction, not a table-level block.'
+					: '';
 			const hints = [
-				`Access denied on ${table}. Likely an ACL — the account may lack the required role, or the field/record is restricted.${roleNote}`,
+				`Access denied on ${table}. Likely an ACL — the account may lack the required role, or the field/record is restricted.${roleNote}${aclNote}`,
 			];
 			if (ctx.operation === 'delete') {
 				hints.push(

@@ -132,7 +132,11 @@ export function formatErrorForTool(error: unknown): string {
  * Centralizes the catch-block boilerplate every tool otherwise repeats.
  */
 export function toolError(error: unknown, ctx: FailureContext = {}) {
-	const hints = renderHints(failureHints(String(error), ctx));
+	// Prefer the structured status code over text matching — ServiceNow's own
+	// error.message (e.g. "User Not Authorized") doesn't reliably contain the
+	// status code or a recognizable keyword.
+	const statusCode = ctx.statusCode ?? (error instanceof ServiceNowError ? error.statusCode : undefined);
+	const hints = renderHints(failureHints(String(error), { ...ctx, statusCode }));
 	return {
 		content: [
 			{ type: 'text' as const, text: formatErrorForTool(error) },

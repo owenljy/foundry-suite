@@ -141,7 +141,7 @@ export async function registerTools(
 
 	const tools: ToolDescriptor[] = [
 		// Table operations (runtime data)
-		createQueryRecordsTool(tableService),
+		createQueryRecordsTool(tableService, schemaService),
 		createAggregateRecordsTool(tableService),
 		createCreateRecordTool(tableService, schemaService),
 		createUpdateRecordTool(tableService, schemaService),

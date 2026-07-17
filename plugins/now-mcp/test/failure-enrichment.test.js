@@ -30,6 +30,53 @@ test('403 hints point at ACLs/roles (not read-only, which is a separate class)',
   assert.doesNotMatch(text, /read-only/i);
 });
 
+test('classifyFailure recognizes 403 from the status code even when the message has no keyword', () => {
+  // ServiceNow's real error.message for a table-level web-service block is
+  // "User Not Authorized" — no "403"/"forbidden"/"access denied" substring.
+  // Without the status code this used to classify as 'unknown' and produce no hint.
+  assert.equal(classifyFailure('User Not Authorized'), 'unknown');
+  assert.equal(classifyFailure('User Not Authorized', 403), '403');
+  assert.equal(classifyFailure('some message', 401), '401');
+  assert.equal(classifyFailure('some message', 404), '404');
+  assert.equal(classifyFailure('some message', 400), '400');
+});
+
+test('403 hint via statusCode alone (no keyword in the message) still fires', () => {
+  const hints = failureHints('User Not Authorized', {
+    table: 'sn_grc_indicator',
+    operation: 'query',
+    statusCode: 403,
+  });
+  assert.match(hints.join(' '), /ACL/);
+});
+
+test('403 with wsAccess:disabled explains the table-level block, not a role guess', () => {
+  const hints = failureHints('User Not Authorized', {
+    table: 'sn_grc_indicator',
+    operation: 'query',
+    statusCode: 403,
+    wsAccess: 'disabled',
+  });
+  const text = hints.join(' ');
+  assert.match(text, /ws_access/);
+  assert.match(text, /web service/i);
+  assert.match(text, /sn_execute_background_script/);
+  assert.match(text, /now-sdk query/);
+  assert.doesNotMatch(text, /likely an acl.*lack the required role/i);
+});
+
+test('403 with wsAccess:enabled keeps the ACL/role hint and notes ws_access is not the cause', () => {
+  const hints = failureHints('403 Access denied', {
+    table: 'incident',
+    operation: 'query',
+    statusCode: 403,
+    wsAccess: 'enabled',
+  });
+  const text = hints.join(' ');
+  assert.match(text, /ACL/);
+  assert.match(text, /Web-service access.*enabled/i);
+});
+
 test('read-only write block gets no extra hint (message is already source-aware)', () => {
   const hints = failureHints(
     "Write operations are not permitted on read-only instance 'prod'. Set ...",

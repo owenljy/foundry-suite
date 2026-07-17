@@ -129,6 +129,49 @@ export class SchemaService {
 	}
 
 	/**
+	 * Check whether a table allows access via web services (sys_db_object.ws_access).
+	 * When false, the REST Table/Stats APIs reject ALL requests to the table
+	 * before any role/ACL evaluation happens — independent of the caller's
+	 * roles or admin status. Used to give a 403 a precise cause instead of a
+	 * generic "maybe you lack a role" guess.
+	 *
+	 * Best-effort: returns null on any failure (network error, the probe
+	 * itself blocked, etc.) so it can never mask or replace the original
+	 * error — same pattern as suggestTableName above. Does not call
+	 * assertTableAllowed: this is an internal advisory probe of table
+	 * metadata, not a read of the blocked table's own data.
+	 */
+	async checkWebServiceAccess(
+		tableName: string,
+		instance?: string,
+	): Promise<{ exists: boolean; wsAccess: boolean } | null> {
+		try {
+			const target = this.resolveCacheTarget(instance);
+			const cacheKey = `wsaccess:${target.cacheNamespace}:${tableName}`;
+			const cached = this.getFromCache<{ exists: boolean; wsAccess: boolean }>(cacheKey);
+			if (cached) return cached;
+
+			const resp = await target.client.get<{
+				result: Array<{ name: string; ws_access: string }>;
+			}>('/api/now/table/sys_db_object', {
+				sysparm_query: `name=${tableName}`,
+				sysparm_fields: 'name,ws_access',
+				sysparm_limit: 1,
+			});
+
+			const row = resp.result[0];
+			const result = { exists: Boolean(row), wsAccess: row?.ws_access === 'true' };
+			this.setCache(cacheKey, result);
+			return result;
+		} catch (error) {
+			logger.debug(`Web-service access check skipped for ${tableName}`, {
+				error: error instanceof Error ? error.message : String(error),
+			});
+			return null;
+		}
+	}
+
+	/**
 	 * Get detailed schema information for a table
 	 * @param tableName Name of the table
 	 * @param includeExtended Include fields from parent tables
